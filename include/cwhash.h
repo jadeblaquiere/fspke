@@ -38,6 +38,14 @@
 extern "C" {
 #endif
 
+// cwHash implements the Carter and Wegman universal hash function family
+// to map (hash) an integer value of arbitrary size to a member of the
+// the integers less than q : {0,1}N -> {0, 1, ... , q-2, q-1}.
+// p must be a prime and for the distribution to be uniform p is much greater
+// than q : p >> q.
+// 
+// see: https://en.wikipedia.org/wiki/Universal_hashing
+
 typedef struct {
     mpz_t p;
     mpz_t q;
@@ -50,7 +58,11 @@ typedef _cwHash_t cwHash_t[1];
 void cwHash_init(cwHash_t cwh);
 void cwHash_clear(cwHash_t cwh);
 
+void cwHash_set(cwHash_t rcwh, cwHash_t cwh);
+
 void cwHash_set_mpz(cwHash_t cwh, mpz_t q, mpz_t p, mpz_t a, mpz_t b);
+
+void cwHash_urandom(cwHash_t cwh, mpz_t q);
 
 void cwHash_hashval(mpz_t hash, cwHash_t cwh, mpz_t x);
 

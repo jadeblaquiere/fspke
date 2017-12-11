@@ -33,31 +33,13 @@
 #include <field.h>
 #include <gmp.h>
 #include <math.h>
+#include <mpzurandom.h>
 #include <check.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 //static char pCurve25519[] = "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed";
 static char pCurve41417[] = "0x3fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffef";
-
-static FILE *f_urandom = NULL;
-
-static void _mpz_urandom(mpz_t rop, mpz_t max) {
-    int bytes, sz_read;
-    char *buffer;
-    if (f_urandom == NULL) {
-        f_urandom = fopen("/dev/urandom", "rb");
-        assert(f_urandom != NULL);
-    }
-    // bytes intentionally long - will truncate with modulo
-    bytes = ((mpz_sizeinbase(max,2) + 7) >> 3) + 1;
-    buffer = (char *)malloc((bytes) * sizeof(char));
-    sz_read = fread(buffer, sizeof(char), bytes, f_urandom);
-    assert(sz_read == bytes);
-    mpz_import(rop, sz_read, 1, sizeof(char), 0, 0, buffer);
-    mpz_mod(rop, rop, max);
-    return;
-}
 
 START_TEST(test_cwh)
     int i, j, coll;
@@ -75,49 +57,163 @@ START_TEST(test_cwh)
 
     mpz_set_ui(p, 251);
     mpz_set_ui(q, 31);
-    _mpz_urandom(a, p);
-    _mpz_urandom(b, p);
+    mpz_urandom(a, p);
+    mpz_urandom(b, p);
     cwHash_set_mpz(cwh, q, p, a, b);
     
     for (j = 0; j < 251; j++) {
         coll = 0;
         mpz_set_ui(y, j);
         cwHash_hashval(hy, cwh, y);
-        gmp_printf("cw-H(%ZX) = %ZX : ", y, hy);
+        assert(mpz_cmp_ui(hy, 0) >= 0);
+        assert(mpz_cmp(hy, q) <0);
+        //gmp_printf("cw-H(%ZX) = %ZX : ", y, hy);
         for (i = 0; i < 251; i++) {
             mpz_set_ui(x, i);
             cwHash_hashval(hx, cwh, x);
             if(mpz_cmp(hx, hy) == 0) {
                 coll += 1;
-                gmp_printf("%ZX ", x);
+                //gmp_printf("%ZX ", x);
             }
+            assert(mpz_cmp_ui(hx, 0) >= 0);
+            assert(mpz_cmp(hx, q) <0);
         }
-        printf("\n");
+        //printf("\n");
+        // ensure uniformity - expected collisions = 251/31 = 8.09
+        // if >9 or <8 we have a problem
+        assert((coll > 7) && (coll <10));
     }
 
     // 2**414-17, 2**255-19 (prime numbers)
     mpz_set_str(p, pCurve41417, 0);
     mpz_set_ui(q, 251);
-    _mpz_urandom(a, p);
-    _mpz_urandom(b, p);
+    mpz_urandom(a, p);
+    mpz_urandom(b, p);
     cwHash_set_mpz(cwh, q, p, a, b);
     
     for (j = 0; j < 100; j++) {
         coll = 0;
-        _mpz_urandom(y, p);
+        mpz_urandom(y, p);
         cwHash_hashval(hy, cwh, y);
-        gmp_printf("cw-H(%ZX) = %ZX : ", y, hy);
+        assert(mpz_cmp_ui(hy, 0) >= 0);
+        assert(mpz_cmp(hy, q) <0);
+        //gmp_printf("cw-H(%ZX) = %ZX : ", y, hy);
         for (i = 0; i < 1000; i++) {
-            _mpz_urandom(x, p);
+            mpz_urandom(x, p);
             cwHash_hashval(hx, cwh, x);
             if(mpz_cmp(hx, hy) == 0) {
                 coll += 1;
-                gmp_printf("%ZX ", x);
+                //gmp_printf("%ZX ", x);
             }
+            assert(mpz_cmp_ui(hx, 0) >= 0);
+            assert(mpz_cmp(hx, q) <0);
         }
-        printf("\n");
+        //printf("\n");
     }
     
+    cwHash_clear(cwh);
+    mpz_clear(hy);
+    mpz_clear(y);
+    mpz_clear(hx);
+    mpz_clear(x);
+    mpz_clear(b);
+    mpz_clear(a);
+    mpz_clear(q);
+    mpz_clear(p);
+END_TEST
+
+START_TEST(test_cwh_urandom)
+    int i, j, p, coll;
+    mpz_t q, x, hx, y, hy;
+    cwHash_t cwh;
+    mpz_init(q);
+    mpz_init(x);
+    mpz_init(hx);
+    mpz_init(y);
+    mpz_init(hy);
+    cwHash_init(cwh);
+
+    mpz_set_ui(q, 31);
+    cwHash_urandom(cwh, q);
+    p = mpz_get_ui(cwh->p);
+    //printf("p = %d\n", p);
+    
+    for (j = 0; j < p ; j++) {
+        coll = 0;
+        mpz_set_ui(y, j);
+        cwHash_hashval(hy, cwh, y);
+        assert(mpz_cmp_ui(hy, 0) >= 0);
+        assert(mpz_cmp(hy, q) <0);
+        //gmp_printf("cw-H(%ZX) = %ZX : ", y, hy);
+        for (i = 0; i < p ; i++) {
+            mpz_set_ui(x, i);
+            cwHash_hashval(hx, cwh, x);
+            if(mpz_cmp(hx, hy) == 0) {
+                coll += 1;
+                //gmp_printf("%ZX ", x);
+            }
+            assert(mpz_cmp_ui(hx, 0) >= 0);
+            assert(mpz_cmp(hx, q) <0);
+        }
+        //printf("j = %d, coll = %d\n", j, coll);
+        assert((coll >= (p/31)) && (coll <= ((p/31)+1)));
+    }
+
+    cwHash_clear(cwh);
+    mpz_clear(hy);
+    mpz_clear(y);
+    mpz_clear(hx);
+    mpz_clear(x);
+    mpz_clear(q);
+END_TEST
+
+START_TEST(test_cwh_set)
+    int j;
+    mpz_t p, q, a, b, x, hx, y, hy;
+    cwHash_t cwh, cwh_cp;
+    mpz_init(p);
+    mpz_init(q);
+    mpz_init(a);
+    mpz_init(b);
+    mpz_init(x);
+    mpz_init(hx);
+    mpz_init(y);
+    mpz_init(hy);
+    cwHash_init(cwh);
+    cwHash_init(cwh_cp);
+
+    mpz_set_ui(p, 251);
+    mpz_set_ui(q, 31);
+    mpz_urandom(a, p);
+    mpz_urandom(b, p);
+    cwHash_set_mpz(cwh, q, p, a, b);
+    cwHash_set(cwh_cp, cwh);
+    
+    for (j = 0; j < 251; j++) {
+        mpz_set_ui(y, j);
+        cwHash_hashval(hy, cwh, y);
+        mpz_set(x, y);
+        cwHash_hashval(hx, cwh_cp, x);
+        assert(mpz_cmp(hx, hy) == 0);
+    }
+
+    // 2**414-17, 2**255-19 (prime numbers)
+    mpz_set_str(p, pCurve41417, 0);
+    mpz_set_ui(q, 251);
+    mpz_urandom(a, p);
+    mpz_urandom(b, p);
+    cwHash_set_mpz(cwh, q, p, a, b);
+    cwHash_set(cwh_cp, cwh);
+    
+    for (j = 0; j < 100; j++) {
+        mpz_urandom(y, p);
+        cwHash_hashval(hy, cwh, y);
+        mpz_set(x, y);
+        cwHash_hashval(hx, cwh_cp, x);
+        assert(mpz_cmp(hx, hy) == 0);
+    }
+    
+    cwHash_clear(cwh_cp);
     cwHash_clear(cwh);
     mpz_clear(hy);
     mpz_clear(y);
@@ -137,6 +233,8 @@ static Suite *cwHash_test_suite(void) {
     tc = tcase_create("arithmetic");
 
     tcase_add_test(tc, test_cwh);
+    tcase_add_test(tc, test_cwh_urandom);
+    tcase_add_test(tc, test_cwh_set);
     suite_add_tcase(s, tc);
     return s;
 }

@@ -32,6 +32,10 @@
 #include <cwhash.h>
 #include <field.h>
 #include <gmp.h>
+#include <mpzurandom.h>
+
+// primality test will accept a composite with probability 4**(-reps)
+#define _MILLER_RABIN_REPS    (40)
 
 void cwHash_init(cwHash_t cwh) {
     mpz_init(cwh->p);
@@ -49,6 +53,15 @@ void cwHash_clear(cwHash_t cwh) {
     return;
 }
 
+void cwHash_set(cwHash_t rcwh, cwHash_t cwh) {
+    assert(mpz_cmp(cwh->p, cwh->q) > 0);
+    mpz_set(rcwh->p, cwh->p);
+    mpz_set(rcwh->q, cwh->q);
+    mpFp_set(rcwh->a, cwh->a);
+    mpFp_set(rcwh->b, cwh->b);
+    return;
+}
+
 void cwHash_set_mpz(cwHash_t cwh, mpz_t q, mpz_t p, mpz_t a, mpz_t b) {
     assert(mpz_cmp(p, q) > 0);
     mpz_set(cwh->p, p);
@@ -56,6 +69,25 @@ void cwHash_set_mpz(cwHash_t cwh, mpz_t q, mpz_t p, mpz_t a, mpz_t b) {
     mpFp_set_mpz(cwh->a, a, p);
     mpFp_set_mpz(cwh->b, b, p);
     return;
+}
+
+void cwHash_urandom(cwHash_t cwh, mpz_t q) {
+    mpz_t qq, p;
+    mpz_init(qq);
+    mpz_init(p);
+    
+    mpz_mul(qq, q, q);
+    do {
+        mpz_urandom(p, qq);
+    } while ((mpz_cmp(p, q) <= 0) || (mpz_probab_prime_p(p, _MILLER_RABIN_REPS) == 0));
+
+    mpz_set(cwh->q, q);
+    mpz_set(cwh->p, p);
+    mpFp_urandom(cwh->a, p);
+    mpFp_urandom(cwh->b, p);
+
+    mpz_clear(p);
+    mpz_clear(qq);
 }
 
 void cwHash_hashval(mpz_t hash, cwHash_t cwh, mpz_t x) {
