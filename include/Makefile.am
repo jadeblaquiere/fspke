@@ -1,1 +1,1 @@
-include_HEADERS = cwhash.h
+include_HEADERS = cwhash.h icarthash.h
