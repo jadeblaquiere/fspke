@@ -28,51 +28,42 @@
 //OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef _ICARTHASH_H_INCLUDED_
-#define _ICARTHASH_H_INCLUDED_
+#include <assert.h>
+#include <check.h>
+#include <chkpke.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#include <cwhash.h>
-#include <ecpoint.h>
-#include <gmp.h>
+START_TEST(test_chkpke_init)
+    CHKPKE_t pke;
+    
+    CHKPKE_init_Gen(pke, 512, 384, 4, 8);
+    CHKPKE_clear(pke);
+END_TEST
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+static Suite *CHKPKE_test_suite(void) {
+    Suite *s;
+    TCase *tc;
+    
+    s = suite_create("Forward Secure PKE implementation based on CHK Model");
+    tc = tcase_create("allocation and traversal");
 
-// icartHash uses the method proposed by Thomas Icart(1) and extended by
-// Eric Brier et. al.(2) to hash a N-bit integer value into to a elliptic
-// curve group defined over a finite field, E(Fp), where 2**N > q and E is
-// in the Short Weierstrass for y**2 = x**3 + ax + b with Generator G and
-// order n.
-// (1) : Thomas Icart, "How to Hash into Elliptic Curves", CRYPTO2009, 
-// https://eprint.iacr.org/2009/226.pdf
-// (2) : Eric Brier et. al., "Efficient Indifferentiable Hashing into
-// Ordinary Elliptic Curves", CRYPTO2010, https://eprint.iacr.org/2009/340.pdf
-
-typedef struct {
-    mpECurve_t cv;
-    cwHash_t cwa;
-    cwHash_t cwb;
-    mpECP_t pt;
-    mpFp_t precalc1_3;
-    mpFp_t precalc1_27;
-    mpz_t precalc_cubert;
-} _icartHash_t;
-
-typedef _icartHash_t icartHash_t[1];
-
-void icartHash_init(icartHash_t ih);
-void icartHash_clear(icartHash_t ih);
-
-void icartHash_set(icartHash_t rih, icartHash_t ih);
-void icartHash_set_param(icartHash_t rih, mpECurve_t cv, cwHash_t cwha, cwHash_t cwhb);
-
-void icartHash_urandom(icartHash_t rih, mpECurve_t cv);
-
-void icartHash_hashval(mpECP_t hash, icartHash_t ih, mpz_t x);
-
-#ifdef __cplusplus
+    tcase_add_test(tc, test_chkpke_init);
+    suite_add_tcase(s, tc);
+    return s;
 }
-#endif
 
-#endif // _ICARTHASH_H_INCLUDED_
+int main(void)
+{
+    int number_failed;
+    Suite *s;
+    SRunner *sr;
+
+    s = CHKPKE_test_suite();
+    sr = srunner_create(s);
+
+    srunner_run_all(sr, CK_NORMAL);
+    number_failed = srunner_ntests_failed(sr);
+    srunner_free(sr);
+    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+}

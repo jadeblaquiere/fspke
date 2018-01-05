@@ -44,7 +44,10 @@ extern "C" {
 // referenced. Supports arbitrary depth. The init parameter provides a
 // callback function which is called for each allocated node to initialize
 // local data at the node. In this way SimpleNTree can be used to manage a
-// tree of data without creating a derived class.
+// tree of data without creating a derived class. Application-specific data
+// can be attached to nodeData and the clear function will be called as part
+// of the cleanup process so any dynamially allocated data referenced by
+// nodeData should be free'd by the clear callback
 
 typedef struct _sparseTree_t {
     int n;

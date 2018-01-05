@@ -1,1 +1,1 @@
-include_HEADERS = cwhash.h icarthash.h sparsetree.h
+include_HEADERS = chkpke.h cwhash.h icarthash.h sparsetree.h
