@@ -39,6 +39,23 @@ START_TEST(test_chkpke_init)
     
     CHKPKE_init_Gen(pke, 512, 384, 4, 8);
     CHKPKE_clear(pke);
+    CHKPKE_init_Gen(pke, 256, 192, 4, 8);
+    CHKPKE_clear(pke);
+    CHKPKE_init_Gen(pke, 128, 96, 4, 8);
+    CHKPKE_clear(pke);
+    CHKPKE_init_Gen(pke, 64, 48, 4, 8);
+    CHKPKE_clear(pke);
+END_TEST
+
+START_TEST(test_chkpke_export_der)
+    CHKPKE_t pke;
+    char *der;
+
+    CHKPKE_init_Gen(pke, 512, 384, 4, 8);
+
+    der = CHKPKE_pubkey_encode_DER(pke, 10);
+
+    CHKPKE_clear(pke);
 END_TEST
 
 static Suite *CHKPKE_test_suite(void) {
@@ -49,6 +66,7 @@ static Suite *CHKPKE_test_suite(void) {
     tc = tcase_create("allocation and traversal");
 
     tcase_add_test(tc, test_chkpke_init);
+    tcase_add_test(tc, test_chkpke_export_der);
     suite_add_tcase(s, tc);
     return s;
 }

@@ -1,0 +1,70 @@
+ForwardSecurePKE DEFINITIONS EXPLICIT TAGS ::=
+
+BEGIN
+
+CHKPrivateKey ::= SEQUENCE {
+    pubkey  CHKPubKey,
+    secrets CHKTreeNodeSecrets
+}
+
+CHKTreeNodeSecrets ::= SEQUENCE OF CHKNodeSecrets
+
+CHKNodeSecrets ::= SEQUENCE {
+    id      CHKNodeID,
+    r       SEQUENCE OF OCTET STRING OPTIONAL,
+    s       OCTET STRING
+}
+
+CHKNodeID ::= SEQUENCE {
+    depth   INTEGER,
+    ordinal INTEGER
+}
+
+CHKPublicKey ::= SEQUENCE {
+    params  PairingParams,
+    pPt     OCTET STRING,
+    qPt     OCTET STRING,
+    depth   INTEGER,
+    order   INTEGER,
+    h       IcartHash
+}
+
+CHKPubKey ::= SEQUENCE {
+    params  PairingParams,
+    p       OCTET STRING,
+    q       OCTET STRING,
+    depth   INTEGER,
+    order   INTEGER,
+    h       IcartHash
+}
+
+PairingParams ::= SEQUENCE {
+    q       OCTET STRING,
+    r       OCTET STRING,
+    h       OCTET STRING,
+    exp2    INTEGER,
+    exp1    INTEGER,
+    sign1   INTEGER,
+    sign0   INTEGER
+}
+
+IcartHash ::= SEQUENCE {
+    -- ECurve Parameters p,a,b,n const or from PairingParams q,1,0,r -- 
+    g       CurvePoint,
+    cwa     CarterWegmanHash,
+    cwb     CarterWegmanHash
+}
+
+CurvePoint ::= SEQUENCE {
+    x       OCTET STRING,
+    y       OCTET STRING
+}
+
+CarterWegmanHash ::= SEQUENCE {
+    p       OCTET STRING,
+    --q       OCTET STRING, suppress q as it is same as PairingParams.q --
+    a       OCTET STRING,
+    b       OCTET STRING
+}
+
+END

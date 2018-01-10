@@ -93,7 +93,14 @@ typedef _CHKPKE_t CHKPKE_t[1];
 //void CHKPKE_init(chkPKE_t chk);
 void CHKPKE_clear(CHKPKE_t chk);
 
+// Gen initializes the pairing-based cryptosystem and creates a private key
 void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order);
+
+// encode_DER allocates and returns a character string - the caller must
+// use free() to release that memory once no longer in use.
+
+char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval);
+char *CHKPKE_privkey_encode_DER(CHKPKE_t, int interval);
 
 #ifdef __cplusplus
 }

@@ -32,6 +32,7 @@
 #include <chkpke.h>
 #include <ecurve.h>
 #include <icarthash.h>
+#include <libtasn1.h>
 #include <sparsetree.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -218,8 +219,10 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     //printf("picking random alpha, Q\n");
     element_init_Zr(alpha, chk->pairing);
     element_random(alpha);
+    assert(element_is1(alpha) != 1);
     element_init_G1(chk->Q, chk->pairing);
-    element_mul(chk->Q, chk->P, alpha);
+    element_pow_zn(chk->Q, chk->P, alpha);
+    assert(element_cmp(chk->Q, chk->P) != 0);
     // precalculate e(P,Q)
     //printf("applying pairing\n");
     element_init_GT(chk->ePQ, chk->pairing);
@@ -318,3 +321,156 @@ void CHKPKE_clear(CHKPKE_t chk) {
     mpz_clear(chk->r);
     mpz_clear(chk->h);
 }
+
+extern const asn1_static_node fspke_asn1_tab[];
+
+int _asn1_write_mpz_as_octet_string(asn1_node root, char *attribute, mpz_t value) {
+    int length;
+    int result;
+    size_t lwrote;
+    char *buffer;
+
+    length = (mpz_sizeinbase(value, 2) + 7) / 8;
+    buffer = (char *)malloc((length+1)*sizeof(char));
+    assert(buffer != NULL);
+    mpz_export(buffer, &lwrote, 1, sizeof(char), 0, 0, value);
+    assert(lwrote == length);
+    result = asn1_write_value(root, attribute, buffer, lwrote);
+    assert(result == 0);
+    free(buffer);
+    return 5 + length;
+}
+
+int _asn1_write_int_as_integer(asn1_node root, char *attribute, int64_t value) {
+    int nbytes;
+    int result;
+    char *buffer;
+    if (value < 0) {
+        if (value > (-((1ll<<7)-1))) {
+            nbytes = 1;
+        } else if (value > (-((1ll<<15)-1))) {
+            nbytes = 2;
+        } else if (value > (-((1ll<<31)-1))) {
+            nbytes = 4;
+        } else {
+            nbytes = 8;
+        }
+    } else {
+        if (value < (1 << 7)) {
+            nbytes = 1;
+        } else if (value < (1ll << 15)) {
+            nbytes = 2;
+        } else if (value < (1ll << 31)) {
+            nbytes = 4;
+        } else {
+            nbytes = 8;
+        }
+    }
+    buffer = (char *)malloc((nbytes + 2) * sizeof(char));
+    assert(buffer != NULL);
+    sprintf(buffer,"%ld", value);
+    //printf("writing %ld (%s), length %d to %s\n", value, buffer, nbytes, attribute);
+    result = asn1_write_value(root, attribute, buffer, 0);
+    //printf("returned %d\n", result);
+    assert(result == 0);
+    free(buffer);
+    return 5 + nbytes;
+}
+
+int _asn1_write_mpECP_as_octet_string(asn1_node root, char *attribute, mpECP_t value) {
+    int length;
+    int i;
+    int result;
+    char *sbuffer;
+    char *buffer;
+
+    length = mpECP_out_strlen(value,1);
+    assert((length % 2) == 0);
+    sbuffer = (char *)malloc((length + 1) * sizeof(char));
+    buffer = (char *)malloc(((length >> 1) + 1) * sizeof(char));
+    mpECP_out_str(sbuffer, value, 1);
+    for (i = 0 ; i < (length >> 1); i++) {
+        result = sscanf(&sbuffer[i << 1],"%2hhx",&buffer[i]);
+        assert(result == 1);
+    }
+    result = asn1_write_value(root, attribute, buffer, (length >> 1));
+    assert(result == 0);
+    free(buffer);
+    free(sbuffer);
+    return 5 + (length >> 1);
+}
+
+char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval) {
+    ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
+    ASN1_TYPE pubkey_asn1 = ASN1_TYPE_EMPTY;
+    char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
+    int result;
+    int length;
+    int sum;
+    size_t lwrote;
+    char *buffer;
+
+    sum = 0;
+
+    result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+
+    if (result != 0) {
+        asn1_perror (result);
+        printf ("%s", asnError);
+        assert(result == 0);
+    }
+
+    // create an empty ASN1 structure
+    result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKPublicKey",
+        &pubkey_asn1);
+    assert(result == 0);
+
+    printf("-----------------\n");
+    asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
+    printf("-----------------\n");
+
+    // Write pairing parameters to ASN1 structure
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "params.q", chk->q);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "params.r", chk->r);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "params.h", chk->h);
+
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "params.exp2", chk->p_exp2);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "params.exp1", chk->p_exp1);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "params.sign1", chk->p_sign1);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "params.sign0", chk->p_sign0);
+
+    // Write public base points (P, Q) to ASN1 structure
+
+    {
+        mpECP_t ppt, qpt;
+        mpECP_init(ppt);
+        mpECP_init(qpt);
+        _mpECP_set_pbc_element(ppt, chk->P, chk->C);
+        sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pPt", ppt);
+        _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
+        sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "qPt", qpt);
+        assert(mpECP_cmp(ppt, qpt) != 0);
+        mpECP_clear(ppt);
+        mpECP_clear(qpt);
+    }
+
+    // validate export of params
+    sum += 16;  // pad for DER header + some extra just in case
+    length = sum;
+    buffer = (char *)malloc((sum) * sizeof(char));
+    result = asn1_der_coding(pubkey_asn1, "params", buffer, &length, asnError);
+    assert(result == 0);
+    assert(length < sum);
+
+    printf("-----------------\n");
+    asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
+    printf("-----------------\n");
+
+    //free (buffer)
+    //sum -= 16;
+
+    asn1_delete_structure(&CHKPKE_asn1);
+    return buffer;
+}
+
+//char *CHKPKE_privkey_encode_DER(CHKPKE_t, int interval);
