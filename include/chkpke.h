@@ -99,8 +99,8 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order);
 // encode_DER allocates and returns a character string - the caller must
 // use free() to release that memory once no longer in use.
 
-char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval);
-char *CHKPKE_privkey_encode_DER(CHKPKE_t, int interval);
+char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval, int *sz);
+char *CHKPKE_privkey_encode_DER(CHKPKE_t, int interval, int *sz);
 
 #ifdef __cplusplus
 }

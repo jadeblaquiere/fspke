@@ -400,7 +400,7 @@ int _asn1_write_mpECP_as_octet_string(asn1_node root, char *attribute, mpECP_t v
     return 5 + (length >> 1);
 }
 
-char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval) {
+char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval, int *sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE pubkey_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -453,12 +453,37 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval) {
         mpECP_clear(ppt);
         mpECP_clear(qpt);
     }
+    
+    // write tree parameters
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "depth", chk->depth);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "order", chk->order);
 
-    // validate export of params
+    // write hash function parameters - generator point
+    {
+        mpz_t x,y;
+        mpz_init(x);
+        mpz_init(y);
+        mpz_set_mpECP_affine_x(x, chk->H->pt);
+        mpz_set_mpECP_affine_y(y, chk->H->pt);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.x", x);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.y", y);
+        mpz_clear(x);
+        mpz_clear(y);
+    }
+    // Carter-Wegman hash function A
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.p", chk->H->cwa->p);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.a", chk->H->cwa->a->i);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.b", chk->H->cwa->b->i);
+    // Carter-Wegman hash function A
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.p", chk->H->cwb->p);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.a", chk->H->cwb->a->i);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.b", chk->H->cwb->b->i);
+
+    // validate export
     sum += 16;  // pad for DER header + some extra just in case
     length = sum;
     buffer = (char *)malloc((sum) * sizeof(char));
-    result = asn1_der_coding(pubkey_asn1, "params", buffer, &length, asnError);
+    result = asn1_der_coding(pubkey_asn1, "", buffer, &length, asnError);
     assert(result == 0);
     assert(length < sum);
 
@@ -466,10 +491,8 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval) {
     asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
     printf("-----------------\n");
 
-    //free (buffer)
-    //sum -= 16;
-
     asn1_delete_structure(&CHKPKE_asn1);
+    *sz = length;
     return buffer;
 }
 

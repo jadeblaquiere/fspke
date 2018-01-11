@@ -49,11 +49,18 @@ END_TEST
 
 START_TEST(test_chkpke_export_der)
     CHKPKE_t pke;
-    char *der;
+    int i;
+    int sz;
+    unsigned char *der;
 
-    CHKPKE_init_Gen(pke, 512, 384, 4, 8);
+    CHKPKE_init_Gen(pke, 512, 400, 6, 16);
 
-    der = CHKPKE_pubkey_encode_DER(pke, 10);
+    der = (unsigned char *)CHKPKE_pubkey_encode_DER(pke, 10, &sz);
+    printf("DER encoded pubkey (%d bytes)=\n", sz);
+    for (i = 0; i < sz; i++) {
+        printf("%02X", der[i]);
+    }
+    printf("\n");
 
     CHKPKE_clear(pke);
 END_TEST
