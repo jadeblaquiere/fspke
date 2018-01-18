@@ -34,6 +34,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static FILE *_f_dev_urandom = NULL;
+
+static int randint(int min, int max) {
+    unsigned int range, value;
+    assert(max > min);
+
+    // +1 makes this return values from min to max inclusive
+    range = (max - min) + 1;
+    if (_f_dev_urandom == NULL) {
+        _f_dev_urandom = fopen("/dev/urandom", "rb");
+        assert(_f_dev_urandom != NULL);
+    }
+    assert(fread(&value, sizeof(int), 1, _f_dev_urandom) == 1);
+    value = value % range;
+    assert(value < range);
+    return min + (value % range);
+}
+
 START_TEST(test_chkpke_init)
     CHKPKE_t pke;
     
@@ -55,12 +73,28 @@ START_TEST(test_chkpke_export_der)
 
     CHKPKE_init_Gen(pke, 512, 400, 6, 16);
 
-    der = (unsigned char *)CHKPKE_pubkey_encode_DER(pke, 10, &sz);
+    der = (unsigned char *)CHKPKE_pubkey_encode_DER(pke, &sz);
+    assert(der != NULL);
     printf("DER encoded pubkey (%d bytes)=\n", sz);
     for (i = 0; i < sz; i++) {
         printf("%02X", der[i]);
     }
     printf("\n");
+
+    free(der);
+    CHKPKE_clear(pke);
+END_TEST
+
+START_TEST(test_chkpke_der)
+    CHKPKE_t pke;
+    int i;
+
+    CHKPKE_init_Gen(pke, 512, 400, 6, 16);
+
+    for (i = 0; i < 25; i++) {
+        CHKPKE_Der(pke, randint(0, (1<<(6*4-1))));
+        //printf("found\n");
+    }
 
     CHKPKE_clear(pke);
 END_TEST
@@ -74,6 +108,7 @@ static Suite *CHKPKE_test_suite(void) {
 
     tcase_add_test(tc, test_chkpke_init);
     tcase_add_test(tc, test_chkpke_export_der);
+    tcase_add_test(tc, test_chkpke_der);
     suite_add_tcase(s, tc);
     return s;
 }

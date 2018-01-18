@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <sparsetree.h>
 #include <stdint.h>
+//#include <stdio.h>
 #include <stdlib.h>
 
 // recursive algorithm to sum the number of nodes in previous rows
@@ -124,6 +125,7 @@ static uint64_t _expi(uint64_t i, uint64_t j) {
 
 _sparseTree_t *sparseTree_find_by_address(sparseTree_t node, int depth, uint64_t ordinal) {
     int path;
+    //printf("sparsetree: trying to find ordinal = %ld from (%d, %ld) + %d\n", ordinal, node->depth, node->ordinal, depth);
     if (depth == 0) {
         assert(node->ordinal == ordinal);
         return node;

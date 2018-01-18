@@ -94,13 +94,23 @@ typedef _CHKPKE_t CHKPKE_t[1];
 void CHKPKE_clear(CHKPKE_t chk);
 
 // Gen initializes the pairing-based cryptosystem and creates a private key
+// The Gen initialization process uses a cryptographically secure random to
+// create a new public and private key set
 void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order);
 
-// encode_DER allocates and returns a character string - the caller must
+// For import/export use ASN1 Distinguished Encoding Rules (DER) format
+// to represent the structured key as an string of bytes.
+// encode_DER allocates and returns a char type string - the caller must
 // use free() to release that memory once no longer in use.
+char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz);
+char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz);
 
-char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval, int *sz);
-char *CHKPKE_privkey_encode_DER(CHKPKE_t, int interval, int *sz);
+// Der attempts to derive the key material for a specific interval and returns
+// -1 on failure (which will occur when attempting to derive a key for a past
+// interval when the key has been pruned).
+int CHKPKE_Der(CHKPKE_t chk, int64_t interval);
+
+
 
 #ifdef __cplusplus
 }

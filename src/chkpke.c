@@ -400,14 +400,14 @@ int _asn1_write_mpECP_as_octet_string(asn1_node root, char *attribute, mpECP_t v
     return 5 + (length >> 1);
 }
 
-char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval, int *sz) {
+char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE pubkey_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
     int result;
     int length;
     int sum;
-    size_t lwrote;
+    //size_t lwrote;
     char *buffer;
 
     sum = 0;
@@ -496,4 +496,241 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int interval, int *sz) {
     return buffer;
 }
 
-//char *CHKPKE_privkey_encode_DER(CHKPKE_t, int interval);
+static int _CHKPKE_der_for_node(CHKPKE_t chk, int depth, int64_t ordinal) {
+    sparseTree_ptr_t node;
+    sparseTree_ptr_t parent;
+    _chkpke_node_data_t *nd;
+    _chkpke_node_data_t *pnd;
+
+    node = sparseTree_find_by_address(chk->tree, depth, ordinal);
+    nd = (_chkpke_node_data_t *)node->nodeData;
+
+    if (nd->S != NULL) {
+        assert (nd->nR == depth);
+        return 0;
+    }
+
+    if (depth == 0) {
+        // got to root node without finding a secret S
+        return -1;
+    }
+
+    parent = node->parent;
+    pnd = (_chkpke_node_data_t *)parent->nodeData;
+    if (_CHKPKE_der_for_node(chk, parent->depth, parent->ordinal) != 0) {
+        return -1;
+    }
+
+    //printf("Der for (%d, %ld)\n", node->depth, node->ordinal);
+
+    nd->S = (element_ptr)malloc(sizeof(struct element_s));
+    nd->R = (element_ptr)malloc(depth*sizeof(struct element_s));
+    nd->nR = depth;
+    {
+        int i;
+        mpz_t x;
+        element_t pw, Hpw, Hcp;
+        mpECP_t H;
+        mpz_init(x);
+        element_init_Zr(pw, chk->pairing);
+        element_init_G1(Hcp, chk->pairing);
+        element_init_G1(Hpw, chk->pairing);
+        mpECP_init(H);
+
+        _mpz_set_ull(x, sparseTree_node_id(node));
+        //printf("calculating Hash\n");
+        icartHash_hashval(H, chk->H, x);
+        _pbc_element_set_mpECP(Hcp, H, chk->pairing);
+        element_random(pw);
+
+        for (i = 0; i < (depth-1); i++) {
+            //printf("copying R[%d] from parent\n", i);
+            element_init_G1(&(nd->R[i]), chk->pairing);
+            element_set(&(nd->R[i]), &(pnd->R[i]));
+        }
+
+        //printf("appending R[%d]\n", depth-1);
+        element_init_G1(&(nd->R[depth-1]), chk->pairing);
+        element_pow_zn(&(nd->R[depth-1]), chk->P, pw);
+        //printf("deriving S from parent, random\n");
+        element_pow_zn(Hpw, Hcp, pw);
+        element_init_G1(nd->S, chk->pairing);
+        element_add(nd->S, pnd->S, Hpw);
+
+        mpECP_clear(H);
+        element_clear(Hpw);
+        element_clear(Hcp);
+        element_clear(pw);
+        mpz_clear(x);
+    }
+    return 0;
+}
+
+int CHKPKE_Der(CHKPKE_t chk, int64_t interval) {
+    return _CHKPKE_der_for_node(chk, chk->depth, interval);
+}
+
+// simple singly linked list
+typedef struct __chkpke_node_config_t {
+    _chkpke_node_data_t *nd;
+    int depth;
+    int64_t ordinal;
+    struct __chkpke_node_config_t *next;
+} _chkpke_node_config_t;
+
+
+static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, int depth, int64_t interval) {
+    _chkpke_node_config_t *head;
+    _chkpke_node_config_t *next;
+    sparseTree_ptr_t node;
+    int64_t i;
+    int64_t stop;
+    if (_CHKPKE_der_for_node(chk, depth, interval) != 0) {
+        return (_chkpke_node_config_t *)NULL;
+    }
+
+    head = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
+    next = head;
+    stop = (interval + chk->order - 1) / chk->order;
+    for (i = interval; i < (stop * chk->order); i++) {
+        assert(_CHKPKE_der_for_node(chk, depth, i) != 0);
+        node = sparseTree_find_by_address(chk->tree, depth, i);
+        next->nd = (_chkpke_node_data_t *)node->nodeData;
+        next->depth = depth;
+        next->ordinal = i;
+        if ((i + 1) < (stop * chk->order)) {
+            next->next = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
+            next = next->next;
+        }
+    }
+
+    {
+        int dnext = depth;
+        int onext = interval;
+
+        while ((((onext + 1) % chk->order) == 0) && (depth > 0)) {
+            dnext -= 1;
+            onext = (onext / chk->order) + 1;
+        }
+
+        if (depth == 0) return head;
+        next->next = _CHKPKE_keylist_for_depth_interval(chk, dnext, onext);
+    }
+    return head;
+}
+
+static _chkpke_node_config_t *_CHKPKE_keylist_for_interval(CHKPKE_t chk, int64_t interval) {
+    return _CHKPKE_keylist_for_depth_interval(chk, chk->depth, interval);
+}
+
+static void _CHKPKE_keylist_clean(_chkpke_node_config_t *list) {
+    if (list->next == (_chkpke_node_config_t *)NULL) {
+        _CHKPKE_keylist_clean(list->next);
+    }
+    free(list);
+    return;
+}
+
+char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
+    _chkpke_node_config_t * keylist;
+    ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
+    ASN1_TYPE pubkey_asn1 = ASN1_TYPE_EMPTY;
+    char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
+    int result;
+    int length;
+    int sum;
+    //size_t lwrote;
+    char *buffer;
+
+    sum = 0;
+
+    keylist = _CHKPKE_keylist_for_interval(chk, interval);
+    if (keylist == (_chkpke_node_config_t *)NULL) {
+        return (char *)NULL;
+    }
+
+    result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+
+    if (result != 0) {
+        asn1_perror (result);
+        printf ("%s", asnError);
+        assert(result == 0);
+    }
+
+    // create an empty ASN1 structure
+    result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKPrivateKey",
+        &pubkey_asn1);
+    assert(result == 0);
+
+    printf("-----------------\n");
+    asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
+    printf("-----------------\n");
+
+    // Write pairing parameters to ASN1 structure
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.params.q", chk->q);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.params.r", chk->r);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.params.h", chk->h);
+
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "pubkey.params.exp2", chk->p_exp2);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "pubkey.params.exp1", chk->p_exp1);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "pubkey.params.sign1", chk->p_sign1);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "pubkey.params.sign0", chk->p_sign0);
+
+    // Write public base points (P, Q) to ASN1 structure
+
+    {
+        mpECP_t ppt, qpt;
+        mpECP_init(ppt);
+        mpECP_init(qpt);
+        _mpECP_set_pbc_element(ppt, chk->P, chk->C);
+        sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pubkey.pPt", ppt);
+        _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
+        sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pubkey.qPt", qpt);
+        assert(mpECP_cmp(ppt, qpt) != 0);
+        mpECP_clear(ppt);
+        mpECP_clear(qpt);
+    }
+
+    // write tree parameters
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "pubkey.depth", chk->depth);
+    sum += _asn1_write_int_as_integer(pubkey_asn1, "pubkey.order", chk->order);
+
+    // write hash function parameters - generator point
+    {
+        mpz_t x,y;
+        mpz_init(x);
+        mpz_init(y);
+        mpz_set_mpECP_affine_x(x, chk->H->pt);
+        mpz_set_mpECP_affine_y(y, chk->H->pt);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.g.x", x);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.g.y", y);
+        mpz_clear(x);
+        mpz_clear(y);
+    }
+    // Carter-Wegman hash function A
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.cwa.p", chk->H->cwa->p);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.cwa.a", chk->H->cwa->a->i);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.cwa.b", chk->H->cwa->b->i);
+    // Carter-Wegman hash function A
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.cwb.p", chk->H->cwb->p);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.cwb.a", chk->H->cwb->a->i);
+    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "pubkey.h.cwb.b", chk->H->cwb->b->i);
+
+    assert(0);
+
+    // validate export
+    sum += 16;  // pad for DER header + some extra just in case
+    length = sum;
+    buffer = (char *)malloc((sum) * sizeof(char));
+    result = asn1_der_coding(pubkey_asn1, "", buffer, &length, asnError);
+    assert(result == 0);
+    assert(length < sum);
+
+    printf("-----------------\n");
+    asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
+    printf("-----------------\n");
+
+    asn1_delete_structure(&CHKPKE_asn1);
+    *sz = length;
+    return buffer;
+}
