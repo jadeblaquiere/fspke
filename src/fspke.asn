@@ -31,8 +31,8 @@ CHKPublicKey ::= SEQUENCE {
 
 CHKPubKey ::= SEQUENCE {
     params  PairingParams,
-    p       OCTET STRING,
-    q       OCTET STRING,
+    pPt     OCTET STRING,
+    qPt     OCTET STRING,
     depth   INTEGER,
     order   INTEGER,
     h       IcartHash

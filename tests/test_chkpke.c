@@ -65,7 +65,21 @@ START_TEST(test_chkpke_init)
     CHKPKE_clear(pke);
 END_TEST
 
-START_TEST(test_chkpke_export_der)
+START_TEST(test_chkpke_der)
+    CHKPKE_t pke;
+    int i;
+
+    CHKPKE_init_Gen(pke, 512, 400, 6, 16);
+
+    for (i = 0; i < 50; i++) {
+        CHKPKE_Der(pke, randint(0, (1<<(6*4-1))));
+        //printf("found\n");
+    }
+
+    CHKPKE_clear(pke);
+END_TEST
+
+START_TEST(test_chkpke_export_pubkey_der)
     CHKPKE_t pke;
     int i;
     int sz;
@@ -85,17 +99,23 @@ START_TEST(test_chkpke_export_der)
     CHKPKE_clear(pke);
 END_TEST
 
-START_TEST(test_chkpke_der)
+START_TEST(test_chkpke_export_privkey_der)
     CHKPKE_t pke;
     int i;
+    int sz;
+    unsigned char *der;
 
     CHKPKE_init_Gen(pke, 512, 400, 6, 16);
 
-    for (i = 0; i < 25; i++) {
-        CHKPKE_Der(pke, randint(0, (1<<(6*4-1))));
-        //printf("found\n");
+    der = (unsigned char *)CHKPKE_privkey_encode_DER(pke, randint(0, (1<<(6*4-1))), &sz);
+    assert(der != NULL);
+    printf("DER encoded pubkey (%d bytes)=\n", sz);
+    for (i = 0; i < sz; i++) {
+        printf("%02X", der[i]);
     }
+    printf("\n");
 
+    free(der);
     CHKPKE_clear(pke);
 END_TEST
 
@@ -107,8 +127,13 @@ static Suite *CHKPKE_test_suite(void) {
     tc = tcase_create("allocation and traversal");
 
     tcase_add_test(tc, test_chkpke_init);
-    tcase_add_test(tc, test_chkpke_export_der);
     tcase_add_test(tc, test_chkpke_der);
+    tcase_add_test(tc, test_chkpke_export_pubkey_der);
+    tcase_add_test(tc, test_chkpke_export_privkey_der);
+
+    // set 10 second timeout instead of default 4
+    tcase_set_timeout(tc, 10.0);
+
     suite_add_tcase(s, tc);
     return s;
 }
