@@ -595,7 +595,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
     head = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
     next = head;
     stop = (interval + chk->order - 1) / chk->order;
-    for (i = interval + 1; i < (stop * chk->order); i++) {
+    for (i = interval; i < (stop * chk->order); i++) {
         //printf("node @ (%d, %ld)\n", depth, i);
         // must call _der_for_node to populate R,S in nodeData
         assert(_CHKPKE_der_for_node(chk, depth, i) == 0);
