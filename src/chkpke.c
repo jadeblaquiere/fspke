@@ -31,12 +31,14 @@
 #include <assert.h>
 #include <chkpke.h>
 #include <ecurve.h>
+#include <endian.h>
 #include <icarthash.h>
 #include <libtasn1.h>
 #include <sparsetree.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 
 typedef struct {
@@ -195,10 +197,49 @@ static void _mpz_set_ull(mpz_t rop, uint64_t op) {
     mpz_import(rop, 1, -1, sizeof(op), 0, 0, &op);
 }
 
-void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
-    element_t alpha;
-    element_t e_pt;
+static void _CHKPKE_setup_ECurve(CHKPKE_t chk, int qbits) {
+        mpz_t a, b, x, y;
+        mpz_init(a);
+        mpz_init(b);
+        mpz_init(x);
+        mpz_init(y);
+        mpz_set_ui(a, 1);
+        mpz_set_ui(b, 0);
+        _pbc_element_G1_to_affine_mpz(x, y, chk->P);
+        mpECurve_set_mpz_ws(chk->C, chk->q, a, b, chk->r, chk->h, x, y, qbits);
+        // extra validation step, ensure Q also on curve C
+        _pbc_element_G1_to_affine_mpz(x, y, chk->Q);
+        assert(mpECurve_point_check(chk->C, x, y));
+        mpz_clear(y);
+        mpz_clear(x);
+        mpz_clear(b);
+        mpz_clear(a);
+}
+
+static void _CHKPKE_precalc_H0(element_t e_pt, CHKPKE_t chk) {
     mpECP_t ecp_pt;
+
+    mpECP_init(ecp_pt);
+    {
+        uint64_t id;
+        mpz_t x;
+        mpz_init(x);
+        // gmp doesn't provide convenience function for importing uint64_t (ull)
+        id = sparseTree_node_id(chk->tree);
+        //printf("id = %lx\n", id);
+        _mpz_set_ull(x, id);
+        //gmp_printf("id = %Zx\n", x);
+        icartHash_hashval(ecp_pt, chk->H, x);
+        mpz_clear(x);
+    }
+    _pbc_element_set_mpECP(e_pt, ecp_pt, chk->pairing);
+    mpECP_clear(ecp_pt);
+    return;
+}
+
+void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
+    element_t e_pt;
+    element_t alpha;
     _chkpke_node_data_t *nd;
     chk->is_secret = true;
     assert(depth>0);
@@ -236,24 +277,7 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     // setup G1 (and G2) curve space
     //printf("expressing as mpECurve_t\n");
     mpECurve_init(chk->C);
-    {
-        mpz_t a, b, x, y;
-        mpz_init(a);
-        mpz_init(b);
-        mpz_init(x);
-        mpz_init(y);
-        mpz_set_ui(a, 1);
-        mpz_set_ui(b, 0);
-        _pbc_element_G1_to_affine_mpz(x, y, chk->P);
-        mpECurve_set_mpz_ws(chk->C, chk->q, a, b, chk->r, chk->h, x, y, qbits);
-        // extra validation step, ensure Q also on curve C
-        _pbc_element_G1_to_affine_mpz(x, y, chk->Q);
-        assert(mpECurve_point_check(chk->C, x, y));
-        mpz_clear(y);
-        mpz_clear(x);
-        mpz_clear(b);
-        mpz_clear(a);
-    }
+    _CHKPKE_setup_ECurve(chk, mpz_sizeinbase(chk->q,2));
     // create a new (random) hash function on curve C
     //printf("initializing random hash function\n");
     icartHash_init(chk->H);
@@ -263,39 +287,11 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     sparseTree_init(chk->tree, order, _init_chk_node);
     // precalculate pairing of Q and H(root node id = 0);
     assert(sparseTree_node_id(chk->tree) == 0);
-    //printf("precalculating H(node(0))\n");
     element_init_G1(e_pt, chk->pairing);
-    mpECP_init(ecp_pt);
-    {
-        uint64_t id;
-        mpz_t x;
-        mpz_init(x);
-        // gmp doesn't provide convenience function for importing uint64_t (ull)
-        id = sparseTree_node_id(chk->tree);
-        //printf("id = %lx\n", id);
-        _mpz_set_ull(x, id);
-        //gmp_printf("id = %Zx\n", x);
-        icartHash_hashval(ecp_pt, chk->H, x);
-        mpz_clear(x);
-    }
-    _pbc_element_set_mpECP(e_pt, ecp_pt, chk->pairing);
-    //{
-    //    char *buffer;
-    //    int sz;
-    //    sz = mpECP_out_strlen(ecp_pt, 0);
-    //    buffer = (char *)malloc((sz + 1) * sizeof(char));
-    //    mpECP_out_str(buffer, ecp_pt, 0);
-    //    buffer[sz] = 0;
-    //    printf("ECP Point = %s\n", buffer);
-    //    free(buffer);
-    //}
-    //element_printf("Element Point = %B\n", e_pt);
+    _CHKPKE_precalc_H0(e_pt, chk);
+    //printf("precalc pairing eQH\n");
     element_init_GT(chk->eQH, chk->pairing);
-    //printf("precalculating eQH\n");
-    //element_printf("left  = %B\n", chk->Q);
-    //element_printf("right = %B\n", e_pt);
-    pairing_apply(chk->eQH, chk->Q, e_pt, chk->pairing);
-    //element_random(chk->eQH);
+    element_pairing(chk->eQH, chk->Q, e_pt);
     //printf("referencing node Data : node(0)\n");
     nd = (_chkpke_node_data_t *)chk->tree->nodeData;
     nd->nR = 0;
@@ -304,6 +300,9 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     //printf("writing secret to node(0)\n");
     element_init_G1(nd->S, chk->pairing);
     element_mul(nd->S, e_pt, alpha);
+    element_clear(e_pt);
+    element_clear(alpha);
+    return;
 }
 
 //void CHKPKE_init(chkPKE_t chk);
@@ -324,7 +323,7 @@ void CHKPKE_clear(CHKPKE_t chk) {
 
 extern const asn1_static_node fspke_asn1_tab[];
 
-int _asn1_write_mpz_as_octet_string(asn1_node root, char *attribute, mpz_t value) {
+static int _asn1_write_mpz_as_octet_string(asn1_node root, char *attribute, mpz_t value) {
     int length;
     int result;
     size_t lwrote;
@@ -336,12 +335,20 @@ int _asn1_write_mpz_as_octet_string(asn1_node root, char *attribute, mpz_t value
     mpz_export(buffer, &lwrote, 1, sizeof(char), 0, 0, value);
     assert(lwrote == length);
     result = asn1_write_value(root, attribute, buffer, lwrote);
-    assert(result == 0);
+    if (result != ASN1_SUCCESS) {
+        int i;
+        printf("error writing ");
+        for (i = 0; i < lwrote; i++) {
+            printf("%02X", buffer[i]);
+        }
+        printf(" to tag : %s\n", attribute);
+    }
+    assert(result == ASN1_SUCCESS);
     free(buffer);
     return 5 + length;
 }
 
-int _asn1_write_int64_as_integer(asn1_node root, char *attribute, int64_t value) {
+static int _asn1_write_int64_as_integer(asn1_node root, char *attribute, int64_t value) {
     int nbytes;
     int result;
     char *buffer;
@@ -372,12 +379,12 @@ int _asn1_write_int64_as_integer(asn1_node root, char *attribute, int64_t value)
     //printf("writing %ld (%s), length %d to %s\n", value, buffer, nbytes, attribute);
     result = asn1_write_value(root, attribute, buffer, 0);
     //printf("returned %d\n", result);
-    assert(result == 0);
+    assert(result == ASN1_SUCCESS);
     free(buffer);
     return 5 + nbytes;
 }
 
-int _asn1_write_mpECP_as_octet_string(asn1_node root, char *attribute, mpECP_t value) {
+static int _asn1_write_mpECP_as_octet_string(asn1_node root, char *attribute, mpECP_t value) {
     int length;
     int i;
     int result;
@@ -401,6 +408,34 @@ int _asn1_write_mpECP_as_octet_string(asn1_node root, char *attribute, mpECP_t v
     free(buffer);
     free(sbuffer);
     return 5 + (length >> 1);
+}
+
+static int _asn1_write_element_t_as_CurvePoint(asn1_node root, char *attribute, element_t value) {
+    //int result;
+    int len;
+    int sum;
+    char *buffer;
+    mpz_t x,y;
+
+    mpz_init(x);
+    mpz_init(y);
+
+    _pbc_element_G1_to_affine_mpz(x, y, value);
+    len = strlen(attribute) + 5;
+    buffer = (char *)malloc((len + 1)*sizeof(char));
+
+    strncpy(buffer, attribute, len);
+    strncat(buffer, ".x", 5);
+    sum = _asn1_write_mpz_as_octet_string(root, buffer, x);
+
+    strncpy(buffer, attribute, len);
+    strncat(buffer, ".y", 5);
+    sum += _asn1_write_mpz_as_octet_string(root, buffer, y);
+
+    mpz_clear(y);
+    mpz_clear(x);
+    // add some buffer for sequence of
+    return sum + 5;
 }
 
 char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
@@ -444,35 +479,46 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
 
     // Write public base points (P, Q) to ASN1 structure
 
-    {
-        mpECP_t ppt, qpt;
-        mpECP_init(ppt);
-        mpECP_init(qpt);
-        _mpECP_set_pbc_element(ppt, chk->P, chk->C);
-        sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pPt", ppt);
-        _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
-        sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "qPt", qpt);
-        assert(mpECP_cmp(ppt, qpt) != 0);
-        mpECP_clear(ppt);
-        mpECP_clear(qpt);
-    }
-    
+    //{
+    //    mpECP_t ppt, qpt;
+    //    mpECP_init(ppt);
+    //    mpECP_init(qpt);
+    //    _mpECP_set_pbc_element(ppt, chk->P, chk->C);
+    //    sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pPt", ppt);
+    //    _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
+    //    sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "qPt", qpt);
+    //    assert(mpECP_cmp(ppt, qpt) != 0);
+    //    mpECP_clear(ppt);
+    //    mpECP_clear(qpt);
+    //}
+
+    sum += _asn1_write_element_t_as_CurvePoint(pubkey_asn1, "pPt", chk->P);
+    sum += _asn1_write_element_t_as_CurvePoint(pubkey_asn1, "qPt", chk->Q);
+
     // write tree parameters
     sum += _asn1_write_int64_as_integer(pubkey_asn1, "depth", chk->depth);
     sum += _asn1_write_int64_as_integer(pubkey_asn1, "order", chk->order);
 
     // write hash function parameters - generator point
+    //{
+    //    mpz_t x,y;
+    //    mpz_init(x);
+    //    mpz_init(y);
+    //    mpz_set_mpECP_affine_x(x, chk->H->pt);
+    //    mpz_set_mpECP_affine_y(y, chk->H->pt);
+    //    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.x", x);
+    //    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.y", y);
+    //    mpz_clear(x);
+    //    mpz_clear(y);
+    //}
     {
-        mpz_t x,y;
-        mpz_init(x);
-        mpz_init(y);
-        mpz_set_mpECP_affine_x(x, chk->H->pt);
-        mpz_set_mpECP_affine_y(y, chk->H->pt);
-        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.x", x);
-        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.y", y);
-        mpz_clear(x);
-        mpz_clear(y);
+        element_t gH;
+        element_init_G1(gH, chk->pairing);
+        _pbc_element_set_mpECP(gH, chk->H->pt, chk->pairing);
+        sum += _asn1_write_element_t_as_CurvePoint(pubkey_asn1, "h.g", gH);
+        element_clear(gH);
     }
+
     // Carter-Wegman hash function A
     sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.p", chk->H->cwa->p);
     sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.a", chk->H->cwa->a->i);
@@ -494,11 +540,14 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
     //asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
     //printf("-----------------\n");
 
+    asn1_delete_structure(&pubkey_asn1);
     asn1_delete_structure(&CHKPKE_asn1);
     *sz = length;
     return buffer;
 }
 
+// derive the secrets for this specific node... recurse up tree as needed
+// to derive as the secrets are calculated only when needed (lazy allocation)
 static int _CHKPKE_der_for_node(CHKPKE_t chk, int depth, int64_t ordinal) {
     sparseTree_ptr_t node;
     sparseTree_ptr_t parent;
@@ -581,6 +630,10 @@ typedef struct __chkpke_node_config_t {
     struct __chkpke_node_config_t *next;
 } _chkpke_node_config_t;
 
+// build a minimal list of keys to represent a specific interval number
+// keeping in mind that keys are hierarchical, so parent can encode all
+// children (so if you don't want ALL the children then you need to
+// encode the children you want and not the parent)
 static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, int depth, int64_t interval) {
     _chkpke_node_config_t *head;
     _chkpke_node_config_t *next;
@@ -592,6 +645,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
         return (_chkpke_node_config_t *)NULL;
     }
 
+    // encode node + right from current level
     head = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
     next = head;
     stop = (interval + chk->order - 1) / chk->order;
@@ -610,10 +664,12 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
         }
     }
 
+    // encode parent + 1 from next level up (and recurse)
     {
         int dnext = depth - 1;
         int onext = (interval / chk->order) + 1;
 
+        // skip encoding level if can encode level - 1
         while (((onext % chk->order) == 0) && (depth > 0)) {
             dnext -= 1;
             onext = (onext / chk->order);
@@ -705,35 +761,46 @@ char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
 
     // Write public base points (P, Q) to ASN1 structure
 
-    {
-        mpECP_t ppt, qpt;
-        mpECP_init(ppt);
-        mpECP_init(qpt);
-        _mpECP_set_pbc_element(ppt, chk->P, chk->C);
-        sum += _asn1_write_mpECP_as_octet_string(privkey_asn1, "pubkey.pPt", ppt);
-        _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
-        sum += _asn1_write_mpECP_as_octet_string(privkey_asn1, "pubkey.qPt", qpt);
-        assert(mpECP_cmp(ppt, qpt) != 0);
-        mpECP_clear(ppt);
-        mpECP_clear(qpt);
-    }
+    //{
+    //    mpECP_t ppt, qpt;
+    //    mpECP_init(ppt);
+    //    mpECP_init(qpt);
+    //    _mpECP_set_pbc_element(ppt, chk->P, chk->C);
+    //    sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pPt", ppt);
+    //    _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
+    //    sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "qPt", qpt);
+    //    assert(mpECP_cmp(ppt, qpt) != 0);
+    //    mpECP_clear(ppt);
+    //    mpECP_clear(qpt);
+    //}
+
+    sum += _asn1_write_element_t_as_CurvePoint(privkey_asn1, "pubkey.pPt", chk->P);
+    sum += _asn1_write_element_t_as_CurvePoint(privkey_asn1, "pubkey.qPt", chk->Q);
 
     // write tree parameters
     sum += _asn1_write_int64_as_integer(privkey_asn1, "pubkey.depth", chk->depth);
     sum += _asn1_write_int64_as_integer(privkey_asn1, "pubkey.order", chk->order);
 
     // write hash function parameters - generator point
+    //{
+    //    mpz_t x,y;
+    //    mpz_init(x);
+    //    mpz_init(y);
+    //    mpz_set_mpECP_affine_x(x, chk->H->pt);
+    //    mpz_set_mpECP_affine_y(y, chk->H->pt);
+    //    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.x", x);
+    //    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.g.y", y);
+    //    mpz_clear(x);
+    //    mpz_clear(y);
+    //}
     {
-        mpz_t x,y;
-        mpz_init(x);
-        mpz_init(y);
-        mpz_set_mpECP_affine_x(x, chk->H->pt);
-        mpz_set_mpECP_affine_y(y, chk->H->pt);
-        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.g.x", x);
-        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.g.y", y);
-        mpz_clear(x);
-        mpz_clear(y);
+        element_t gH;
+        element_init_G1(gH, chk->pairing);
+        _pbc_element_set_mpECP(gH, chk->H->pt, chk->pairing);
+        sum += _asn1_write_element_t_as_CurvePoint(privkey_asn1, "pubkey.h.g", gH);
+        element_clear(gH);
     }
+
     // Carter-Wegman hash function A
     sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.p", chk->H->cwa->p);
     sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.a", chk->H->cwa->a->i);
@@ -785,8 +852,380 @@ char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
     //asn1_print_structure(stdout, privkey_asn1, "", ASN1_PRINT_ALL);
     //printf("-----------------\n");
 
+    asn1_delete_structure(&privkey_asn1);
     asn1_delete_structure(&CHKPKE_asn1);
     _CHKPKE_keylist_clean(keylist);
     *sz = length;
     return buffer;
+}
+
+static int _asn1_read_mpz_from_octet_string(mpz_t value, asn1_node root, char *attribute) {
+    int result, length, lread;
+    char *buffer;
+
+    // call read_value with NULL buffer to get length
+    length = 0;
+    result = asn1_read_value(root, attribute, NULL, &length);
+    //printf("result = %d\n", result);
+    if (result != ASN1_MEM_ERROR) return -1;
+    //assert(result == ASN1_MEM_ERROR);
+    if (length <= 0) return -1;
+    //assert(length > 0);
+    // allocate
+    buffer = (char *)malloc((length+1)*sizeof(char));
+    lread = length + 1;
+    result = asn1_read_value(root, attribute, buffer, &lread);
+    if (result != ASN1_SUCCESS) return -1;
+    //assert(result == 0);
+    if (lread != length) return -1;
+    //assert(lread == length);
+    mpz_import(value, lread, 1, sizeof(char), 0, 0, buffer);
+    return 0;
+}
+
+static int _asn1_read_int_from_integer(int *value, asn1_node root, char *attribute) {
+    int result, length, lread;
+    uint32_t uvalue;
+    //char *buffer;
+
+    assert(sizeof(int) == 4);
+    // call read_value with NULL buffer to get length
+    length = 0;
+    result = asn1_read_value(root, attribute, NULL, &length);
+    //printf("result = %d\n", result);
+    if (result != ASN1_MEM_ERROR) return -1;
+    //assert(result == ASN1_MEM_ERROR);
+    if (length <= 0) return -1;
+    //assert(length > 0);
+    if (length > sizeof(int)) return -1;
+    lread = sizeof(int);
+    result = asn1_read_value(root, attribute, &uvalue, &lread);
+    if (result != ASN1_SUCCESS) return -1;
+    //assert(result == 0);
+    if (lread != length) return -1;
+    //assert(lread == length);
+    //{
+    //    unsigned char *bytes;
+    //    int i;
+    //
+    //    printf("read %d byte integer as ", length);
+    //    bytes = (unsigned char *)&uvalue;
+    //    for (i = 0; i < length; i++) {
+    //        printf("%02X ", bytes[i]);
+    //    }
+    //    printf(" = %d\n", (int)uvalue);
+    //}
+    *value = (int)be32toh(uvalue);
+    //printf("value = 0x%08X", *value);
+    if (length < sizeof(int)) {
+        *value >>= ((sizeof(int) - length) * 8) ;
+    }
+    //printf("adjusted value = %d\n", *value);
+    return 0;
+}
+
+static int _asn1_read_element_t_from_CurvePoint(element_t value, asn1_node root, char *attribute) {
+    int result, length, lread, len, len_element;
+    char *buffer, *abuffer;
+
+    len = strlen(attribute) + 5;
+    abuffer = (char *)malloc((len + 1)*sizeof(char));
+
+    // call read_value with NULL buffer to get length
+    strncpy(abuffer, attribute, len);
+    strncat(abuffer, ".x", 5);
+    length = 0;
+    result = asn1_read_value(root, abuffer, NULL, &length);
+    //printf("result = %d\n", result);
+    if (result != ASN1_MEM_ERROR) return -1;
+    //assert(result == ASN1_MEM_ERROR);
+    if (length <= 0) return -1;
+    //assert(length > 0);
+    // allocate
+    len_element = element_length_in_bytes_x_only(value);
+    //printf("length string = %d, length element expected = %d\n", length, len_element);
+    assert(len_element >= length);
+    //printf("allocating space for 2x %d-bit x,y values\n", (length * 8));
+    buffer = (char *)malloc(((len_element * 2) + 1)*sizeof(char));
+    bzero(buffer, len_element * 2);
+
+    lread = length + 1;
+    result = asn1_read_value(root, abuffer, &buffer[len_element-length], &lread);
+    if (result != ASN1_SUCCESS) return -1;
+    //printf("read X\n");
+    //assert(result == 0);
+    if (lread != length) return -1;
+    //assert(lread == length);
+    //{
+    //    int i;
+    //    printf("read X (%s) as :", abuffer);
+    //    for (i = 0; i < length; i++) {
+    //        printf("%02X", (unsigned char)buffer[i]);
+    //    }
+    //    printf("\n");
+    //}
+
+    strncpy(abuffer, attribute, len);
+    strncat(abuffer, ".y", 5);
+    length = 0;
+    result = asn1_read_value(root, abuffer, NULL, &length);
+    //printf("result = %d\n", result);
+    if (result != ASN1_MEM_ERROR) return -1;
+    //assert(result == ASN1_MEM_ERROR);
+    if (length <= 0) return -1;
+    //assert(length > 0);
+    assert(len_element >= length);
+    lread = length + 1;
+    result = asn1_read_value(root, abuffer, &buffer[(2*len_element)-length], &lread);
+    if (result != ASN1_SUCCESS) return -1;
+    //printf("read Y\n");
+    //assert(result == 0);
+    if (lread != length) return -1;
+    //assert(lread == length);
+    //{
+    //    int i;
+    //    printf("read Y (%s) as :", abuffer);
+    //    for (i = 0; i < length; i++) {
+    //        printf("%02X", (unsigned char)buffer[i+length]);
+    //    }
+    //    printf("\n");
+    //}
+
+    element_from_bytes(value, (unsigned char*)buffer);
+    free(buffer);
+    free(abuffer);
+    return 0;
+}
+
+static char *_gen_pbc_param_a_string(CHKPKE_t chk) {
+    int sz;
+    char *buffer;
+
+    // upper bounds on size based on bits in q
+    // fixed text, spaces, etc ~= 42 chars, round up to 64
+    // assume q,r,h all <=exp2 bits long, >4 bits per byte
+    // assume exp2, exp1, sign1, sign0 all <10 bytes
+    sz = 48 + ((chk->p_exp2 * 3) / 4) + (4 * 10);
+    buffer = (char *)malloc(sz * sizeof(char));
+
+    gmp_sprintf(buffer,
+        "type a\nq %Zd\nh %Zd\nr %Zd\nexp2 %d\nexp1 %d\nsign1 %d\nsign0 %d\n",
+        chk->q, chk->h, chk->r, chk->p_exp2, chk->p_exp1, chk->p_sign1,
+        chk->p_sign0);
+    return buffer;
+}
+
+int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
+    ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
+    ASN1_TYPE pubkey_asn1 = ASN1_TYPE_EMPTY;
+    char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
+    char *param_string;
+    int result;
+    mpECurve_t hcv;
+    cwHash_t cwa, cwb;
+    mpz_t p, a, b;
+    element_t e_pt;
+    int qbits;
+    //int length;
+    //int lwrote;
+    //char *buffer;
+
+    result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+
+    if (result != 0) {
+        asn1_perror (result);
+        printf ("%s", asnError);
+        assert(result == 0);
+    }
+
+    // create an empty ASN1 structure
+    result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKPublicKey",
+        &pubkey_asn1);
+    assert(result == 0);
+
+    //printf("-----------------\n");
+    //asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
+    //printf("-----------------\n");
+
+    // read DER into ASN1 structure
+    result = asn1_der_decoding(&pubkey_asn1, der, sz, asnError);
+
+    //printf("-----------------\n");
+    //asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
+    //printf("-----------------\n");
+
+    // Initialize pairing parameter fields
+    mpz_init(chk->q);
+    mpz_init(chk->r);
+    mpz_init(chk->h);
+
+    // Read pairing parameters from ASN1 structure
+    result = _asn1_read_mpz_from_octet_string(chk->q, pubkey_asn1, "params.q");
+    if (result != 0) goto error_cleanup1;
+    //gmp_printf("q parsed as : %Zd (0x%Zx)\n", chk->q, chk->q);
+
+    result = _asn1_read_mpz_from_octet_string(chk->r, pubkey_asn1, "params.r");
+    if (result != 0) goto error_cleanup1;
+    //gmp_printf("r parsed as : %Zd (0x%Zx)\n", chk->r, chk->r);
+
+    result = _asn1_read_mpz_from_octet_string(chk->h, pubkey_asn1, "params.h");
+    if (result != 0) goto error_cleanup1;
+    //gmp_printf("h parsed as : %Zd (0x%Zx)\n", chk->h, chk->h);
+
+    result = _asn1_read_int_from_integer(&(chk->p_exp2), pubkey_asn1, "params.exp2");
+    if (result != 0) goto error_cleanup1;
+    //gmp_printf("exp2 parsed as : %d (0x%x)\n", chk->p_exp2, chk->p_exp2);
+
+    result = _asn1_read_int_from_integer(&(chk->p_exp1), pubkey_asn1, "params.exp1");
+    if (result != 0) goto error_cleanup1;
+    //gmp_printf("exp1 parsed as : %d (0x%x)\n", chk->p_exp1, chk->p_exp1);
+
+    result = _asn1_read_int_from_integer(&(chk->p_sign1), pubkey_asn1, "params.sign1");
+    if (result != 0) goto error_cleanup1;
+    //gmp_printf("sign1 parsed as : %d (0x%x)\n", chk->p_sign1, chk->p_sign1);
+
+    result = _asn1_read_int_from_integer(&(chk->p_sign0), pubkey_asn1, "params.sign0");
+    if (result != 0) goto error_cleanup1;
+    //gmp_printf("sign0 parsed as : %d (0x%x)\n", chk->p_sign0, chk->p_sign0);
+
+    param_string = _gen_pbc_param_a_string(chk);
+    //printf("-----\nParams\n-----\n%s-----\n", param_string);
+
+    result = pbc_param_init_set_str(chk->param, param_string);
+    assert(result == 0);
+    if (result != 0) goto error_cleanup1;
+    free(param_string);
+
+    //printf("init pairing\n");
+    pairing_init_pbc_param(chk->pairing, chk->param);
+    //printf("init curve\n");
+    mpECurve_init(chk->C);
+    //printf("setup curve\n");
+    qbits = mpz_sizeinbase(chk->q, 2);
+    //printf("setup curve qbits = %d\n", qbits);
+
+    element_init_G1(chk->P,chk->pairing);
+    element_init_G1(chk->Q,chk->pairing);
+    element_init_GT(chk->ePQ,chk->pairing);
+    mpECurve_init(hcv);
+    cwHash_init(cwa);
+    cwHash_init(cwb);
+    mpz_init(p);
+    mpz_init(a);
+    mpz_init(b);
+
+    result = _asn1_read_element_t_from_CurvePoint(chk->P, pubkey_asn1, "pPt");
+    if (result != 0) goto error_cleanup2;
+    //element_printf("P: %B\n", chk->P);
+
+    result = _asn1_read_element_t_from_CurvePoint(chk->Q, pubkey_asn1, "qPt");
+    if (result != 0) goto error_cleanup2;
+    //element_printf("Q: %B\n", chk->Q);
+
+    element_pairing(chk->ePQ, chk->P, chk->Q);
+
+    _CHKPKE_setup_ECurve(chk, qbits);
+
+    result = _asn1_read_int_from_integer(&(chk->depth), pubkey_asn1, "depth");
+    if (result != 0) goto error_cleanup2;
+    //gmp_printf("depth parsed as : %d (0x%x)\n", chk->depth, chk->depth);
+
+    result = _asn1_read_int_from_integer(&(chk->order), pubkey_asn1, "order");
+    if (result != 0) goto error_cleanup2;
+    //gmp_printf("order parsed as : %d (0x%x)\n", chk->order, chk->order);
+
+    {
+        mpz_t x,y;
+
+        mpz_init(x);
+        result = _asn1_read_mpz_from_octet_string(x, pubkey_asn1, "h.g.x");
+        if (result != 0) {
+            mpz_clear(x);
+            goto error_cleanup2;
+        }
+        //gmp_printf("g.x parsed as : %Zd (0x%Zx)\n", x, x);
+
+        mpz_init(y);
+         result = _asn1_read_mpz_from_octet_string(y, pubkey_asn1, "h.g.y");
+        if (result != 0) {
+            mpz_clear(y);
+            mpz_clear(x);
+            goto error_cleanup2;
+        }
+        //gmp_printf("g.y parsed as : %Zd (0x%Zx)\n", y, y);
+
+        mpECurve_set_mpz_ws(hcv, chk->q, chk->C->coeff.ws.a->i,
+            chk->C->coeff.ws.b->i, chk->r, chk->h, x, y, qbits);
+
+        mpz_clear(y);
+        mpz_clear(x);
+    }
+
+    result = _asn1_read_mpz_from_octet_string(p, pubkey_asn1, "h.cwa.p");
+    if (result != 0) goto error_cleanup2;
+    result = _asn1_read_mpz_from_octet_string(a, pubkey_asn1, "h.cwa.a");
+    if (result != 0) goto error_cleanup2;
+    result = _asn1_read_mpz_from_octet_string(b, pubkey_asn1, "h.cwa.b");
+    if (result != 0) goto error_cleanup2;
+    //gmp_printf("cwa.p parsed as : %Zd (0x%Zx)\n", p, p);
+    //gmp_printf("cwa.a parsed as : %Zd (0x%Zx)\n", a, a);
+    //gmp_printf("cwa.b parsed as : %Zd (0x%Zx)\n", b, b);
+    cwHash_set_mpz(cwa, chk->r, p, a, b);
+
+    result = _asn1_read_mpz_from_octet_string(p, pubkey_asn1, "h.cwb.p");
+    if (result != 0) goto error_cleanup2;
+    result = _asn1_read_mpz_from_octet_string(a, pubkey_asn1, "h.cwb.a");
+    if (result != 0) goto error_cleanup2;
+    result = _asn1_read_mpz_from_octet_string(b, pubkey_asn1, "h.cwb.b");
+    if (result != 0) goto error_cleanup2;
+    //gmp_printf("cwb.p parsed as : %Zd (0x%Zx)\n", p, p);
+    //gmp_printf("cwb.a parsed as : %Zd (0x%Zx)\n", a, a);
+    //gmp_printf("cwb.b parsed as : %Zd (0x%Zx)\n", b, b);
+    cwHash_set_mpz(cwb, chk->r, p, a, b);
+
+    icartHash_init(chk->H);
+    icartHash_set_param(chk->H, hcv, cwa, cwb);
+    sparseTree_init(chk->tree, chk->order, _init_chk_node);
+    element_init_G1(e_pt, chk->pairing);
+    _CHKPKE_precalc_H0(e_pt, chk);
+    element_init_GT(chk->eQH, chk->pairing);
+    element_pairing(chk->eQH, chk->Q, e_pt);
+    chk->is_secret = false;
+    // /printf("init complete\n");
+
+    element_clear(e_pt);
+    mpz_clear(b);
+    mpz_clear(a);
+    mpz_clear(p);
+    cwHash_clear(cwb);
+    cwHash_clear(cwa);
+    mpECurve_clear(hcv);
+    asn1_delete_structure(&pubkey_asn1);
+    asn1_delete_structure(&CHKPKE_asn1);
+    return 0;
+
+error_cleanup2:
+    mpz_clear(b);
+    mpz_clear(a);
+    mpz_clear(p);
+    cwHash_clear(cwb);
+    cwHash_clear(cwa);
+    mpECurve_clear(hcv);
+    element_clear(chk->ePQ);
+    element_clear(chk->P);
+    element_clear(chk->Q);
+    pbc_param_clear(chk->param);
+
+error_cleanup1:
+    mpz_clear(chk->h);
+    mpz_clear(chk->r);
+    mpz_clear(chk->q);
+    asn1_delete_structure(&pubkey_asn1);
+    asn1_delete_structure(&CHKPKE_asn1);
+    return -1;
+}
+
+int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
+    assert(0);
+    return 0;
 }

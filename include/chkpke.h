@@ -105,12 +105,14 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order);
 char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz);
 char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz);
 
+// decode routines return non-zero on decode error
+int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz);
+int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz);
+
 // Der attempts to derive the key material for a specific interval and returns
 // -1 on failure (which will occur when attempting to derive a key for a past
 // interval when the key has been pruned).
 int CHKPKE_Der(CHKPKE_t chk, int64_t interval);
-
-
 
 #ifdef __cplusplus
 }

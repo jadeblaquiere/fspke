@@ -22,8 +22,8 @@ CHKNodeID ::= SEQUENCE {
 
 CHKPublicKey ::= SEQUENCE {
     params  PairingParams,
-    pPt     OCTET STRING,
-    qPt     OCTET STRING,
+    pPt     CurvePoint,
+    qPt     CurvePoint,
     depth   INTEGER,
     order   INTEGER,
     h       IcartHash
@@ -31,8 +31,8 @@ CHKPublicKey ::= SEQUENCE {
 
 CHKPubKey ::= SEQUENCE {
     params  PairingParams,
-    pPt     OCTET STRING,
-    qPt     OCTET STRING,
+    pPt     CurvePoint,
+    qPt     CurvePoint,
     depth   INTEGER,
     order   INTEGER,
     h       IcartHash

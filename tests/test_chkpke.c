@@ -81,27 +81,44 @@ END_TEST
 
 START_TEST(test_chkpke_export_pubkey_der)
     CHKPKE_t pke;
+    CHKPKE_t npke;
     int i;
-    int sz;
-    unsigned char *der;
+    int sz1;
+    int sz2;
+    unsigned char *der1;
+    unsigned char *der2;
 
     CHKPKE_init_Gen(pke, 512, 400, 6, 16);
 
-    der = (unsigned char *)CHKPKE_pubkey_encode_DER(pke, &sz);
-    assert(der != NULL);
-    printf("DER encoded pubkey (%d bytes)=\n", sz);
-    for (i = 0; i < sz; i++) {
-        printf("%02X", der[i]);
+    der1 = (unsigned char *)CHKPKE_pubkey_encode_DER(pke, &sz1);
+    assert(der1 != NULL);
+    printf("DER encoded pubkey (%d bytes)=\n", sz1);
+    for (i = 0; i < sz1; i++) {
+        printf("%02X", der1[i]);
     }
     printf("\n");
 
-    free(der);
+    i = CHKPKE_init_pubkey_decode_DER(npke, (char *)der1, sz1);
+    assert(i == 0);
+
+    der2 = (unsigned char *)CHKPKE_pubkey_encode_DER(npke, &sz2);
+    assert(der2 != NULL);
+    printf("DER encoded pubkey (%d bytes)=\n", sz2);
+    assert(sz1 == sz2);
+    for (i = 0; i < sz2; i++) {
+        printf("%02X", der2[i]);
+        assert(der1[i] == der2[i]);
+    }
+    printf("\n");
+
+    free(der2);
+    free(der1);
     CHKPKE_clear(pke);
 END_TEST
 
 START_TEST(test_chkpke_export_privkey_der)
     CHKPKE_t pke;
-    int i;
+    //int i;
     int sz;
     unsigned char *der;
 
@@ -109,11 +126,11 @@ START_TEST(test_chkpke_export_privkey_der)
 
     der = (unsigned char *)CHKPKE_privkey_encode_DER(pke, randint(0, (1<<(6*4-1))), &sz);
     assert(der != NULL);
-    printf("DER encoded pubkey (%d bytes)=\n", sz);
-    for (i = 0; i < sz; i++) {
-        printf("%02X", der[i]);
-    }
-    printf("\n");
+    //printf("DER encoded privkey (%d bytes)=\n", sz);
+    //for (i = 0; i < sz; i++) {
+    //    printf("%02X", der[i]);
+    //}
+    //printf("\n");
 
     free(der);
     CHKPKE_clear(pke);
