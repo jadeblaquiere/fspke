@@ -80,17 +80,17 @@ START_TEST(test_chkpke_der)
 END_TEST
 
 START_TEST(test_chkpke_export_pubkey_der)
-    CHKPKE_t pke;
-    CHKPKE_t npke;
+    CHKPKE_t pke1;
+    CHKPKE_t pke2;
     int i;
     int sz1;
     int sz2;
     unsigned char *der1;
     unsigned char *der2;
 
-    CHKPKE_init_Gen(pke, 512, 400, 6, 16);
+    CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
 
-    der1 = (unsigned char *)CHKPKE_pubkey_encode_DER(pke, &sz1);
+    der1 = (unsigned char *)CHKPKE_pubkey_encode_DER(pke1, &sz1);
     assert(der1 != NULL);
     printf("DER encoded pubkey (%d bytes)=\n", sz1);
     for (i = 0; i < sz1; i++) {
@@ -98,10 +98,10 @@ START_TEST(test_chkpke_export_pubkey_der)
     }
     printf("\n");
 
-    i = CHKPKE_init_pubkey_decode_DER(npke, (char *)der1, sz1);
+    i = CHKPKE_init_pubkey_decode_DER(pke2, (char *)der1, sz1);
     assert(i == 0);
 
-    der2 = (unsigned char *)CHKPKE_pubkey_encode_DER(npke, &sz2);
+    der2 = (unsigned char *)CHKPKE_pubkey_encode_DER(pke2, &sz2);
     assert(der2 != NULL);
     printf("DER encoded pubkey (%d bytes)=\n", sz2);
     assert(sz1 == sz2);
@@ -113,27 +113,83 @@ START_TEST(test_chkpke_export_pubkey_der)
 
     free(der2);
     free(der1);
-    CHKPKE_clear(pke);
+    CHKPKE_clear(pke2);
+    CHKPKE_clear(pke1);
 END_TEST
 
 START_TEST(test_chkpke_export_privkey_der)
-    CHKPKE_t pke;
-    //int i;
-    int sz;
-    unsigned char *der;
+    CHKPKE_t pke1;
+    CHKPKE_t pke2;
+    CHKPKE_t pke3;
+    int i;
+    int sz1;
+    int sz2;
+    int sz3;
+    int sz4;
+    unsigned char *der1;
+    unsigned char *der2;
+    unsigned char *der3;
+    unsigned char *der4;
+    int interval;
+    
+    interval = randint(0, (1<<(6*4-1)));
 
-    CHKPKE_init_Gen(pke, 512, 400, 6, 16);
+    //printf("generating key\n");
+    CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
 
-    der = (unsigned char *)CHKPKE_privkey_encode_DER(pke, randint(0, (1<<(6*4-1))), &sz);
-    assert(der != NULL);
-    //printf("DER encoded privkey (%d bytes)=\n", sz);
-    //for (i = 0; i < sz; i++) {
-    //    printf("%02X", der[i]);
-    //}
-    //printf("\n");
+    //printf("exporting key\n");
+    der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval, &sz1);
+    assert(der1 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz1);
+    for (i = 0; i < sz1; i++) {
+        printf("%02X", der1[i]);
+    }
+    printf("\n");
 
-    free(der);
-    CHKPKE_clear(pke);
+    i = CHKPKE_init_privkey_decode_DER(pke2, (char *)der1, sz1);
+    assert(i == 0);
+    der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, interval, &sz2);
+    assert(der2 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz2);
+    assert(sz1 == sz2);
+    for (i = 0; i < sz2; i++) {
+        printf("%02X", der2[i]);
+        assert(der1[i] == der2[i]);
+    }
+    printf("\n");
+
+    // validate that can't derive key for previous interval
+    der3 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, interval - 1, &sz3);
+    assert(der3 == NULL);
+
+    // derive key from original key
+    der3 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval - 1, &sz3);
+    assert(der3 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz3);
+    for (i = 0; i < sz3; i++) {
+        printf("%02X", der3[i]);
+    }
+    printf("\n");
+
+    i = CHKPKE_init_privkey_decode_DER(pke3, (char *)der1, sz1);
+    assert(i == 0);
+    der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke3, interval, &sz4);
+    assert(der4 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz2);
+    assert(sz1 == sz4);
+    for (i = 0; i < sz4; i++) {
+        printf("%02X", der4[i]);
+        assert(der1[i] == der4[i]);
+    }
+    printf("\n");
+
+    free(der4);
+    free(der3);
+    free(der2);
+    free(der1);
+    CHKPKE_clear(pke3);
+    CHKPKE_clear(pke2);
+    CHKPKE_clear(pke1);
 END_TEST
 
 static Suite *CHKPKE_test_suite(void) {
