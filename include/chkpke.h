@@ -114,6 +114,22 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz);
 // interval when the key has been pruned).
 int CHKPKE_Der(CHKPKE_t chk, int64_t interval);
 
+// Upd updates to a specific interval, removing all secret information which
+// could be used to decrypt messages from a previous interval. Returns 0 on
+// success and nonzero on error (e.g. when attempting to derive secrets for
+// a past interval for which no base secret exists)
+int CHKPKE_Upd(CHKPKE_t chk, int64_t interval);
+
+// Enc_DER uses the public key attributes to encode a plaintext message into a
+// ciphertext. The "plaintext" message in this case is an element of Fp2 and
+// the resulting ciphertext is a combination of Elliptic curve points in E(Fp)
+// along with an element in Fp2. Enc_DER returns a DER encoded byte buffer
+// containing the ciphertext - the caller must use free() to release that
+// memory once no longer in use. The message is encoded for a particular
+// interval. Once a private key is updated to a future interval the resulting
+// message cannot be decrypted.
+char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval);
+
 #ifdef __cplusplus
 }
 #endif

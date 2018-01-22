@@ -150,13 +150,13 @@ START_TEST(test_chkpke_export_privkey_der)
     assert(i == 0);
     der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, interval, &sz2);
     assert(der2 != NULL);
-    printf("DER encoded privkey (%d bytes)=\n", sz2);
+    //printf("DER encoded privkey (%d bytes)=\n", sz2);
     assert(sz1 == sz2);
     for (i = 0; i < sz2; i++) {
-        printf("%02X", der2[i]);
+        //printf("%02X", der2[i]);
         assert(der1[i] == der2[i]);
     }
-    printf("\n");
+    //printf("\n");
 
     // validate that can't derive key for previous interval
     der3 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, interval - 1, &sz3);
@@ -171,17 +171,45 @@ START_TEST(test_chkpke_export_privkey_der)
     }
     printf("\n");
 
-    i = CHKPKE_init_privkey_decode_DER(pke3, (char *)der1, sz1);
+    i = CHKPKE_init_privkey_decode_DER(pke3, (char *)der3, sz3);
     assert(i == 0);
     der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke3, interval, &sz4);
     assert(der4 != NULL);
-    printf("DER encoded privkey (%d bytes)=\n", sz2);
+    //printf("DER encoded privkey (%d bytes)=\n", sz4);
     assert(sz1 == sz4);
     for (i = 0; i < sz4; i++) {
-        printf("%02X", der4[i]);
+        //printf("%02X", der4[i]);
         assert(der1[i] == der4[i]);
     }
-    printf("\n");
+    //printf("\n");
+
+    free(der4);
+    der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke3, interval-1, &sz4);
+    assert(der4 != NULL);
+    //printf("DER encoded privkey (%d bytes)=\n", sz4);
+    assert(sz3 == sz4);
+    for (i = 0; i < sz4; i++) {
+        //printf("%02X", der4[i]);
+        assert(der3[i] == der4[i]);
+    }
+    //printf("\n");
+
+    for (i = 0; i < 50; i++) {
+        assert(CHKPKE_Der(pke1, randint(0, interval-1)) == 0);
+    }
+
+    // Update pke1 for current interval
+    i = CHKPKE_Upd(pke1, interval);
+    assert(i == 0);
+    // validate that can't derive key for previous interval
+    der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval - 1, &sz4);
+    assert(der4 == NULL);
+    der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval, &sz4);
+    assert(der4 != NULL);
+
+    for (i = 0; i < 50; i++) {
+        assert(CHKPKE_Der(pke1, randint(0, interval-1)) != 0);
+    }
 
     free(der4);
     free(der3);

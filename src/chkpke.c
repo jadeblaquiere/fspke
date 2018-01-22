@@ -54,6 +54,7 @@ static void _clear_chk_node(_sparseTree_t *node) {
     if (nd->S != NULL) {
         element_clear(nd->S);
         free(nd->S);
+        nd->S = (element_ptr)NULL;
     }
     if (nd->R != NULL) {
         int i;
@@ -61,8 +62,15 @@ static void _clear_chk_node(_sparseTree_t *node) {
             element_clear(&(nd->R[i]));
         }
         free(nd->R);
+        nd->R = (element_ptr)NULL;
+        nd->nR = 0;
     }
-    free(nd);
+    return;
+}
+
+static void _clear_and_free_chk_node(_sparseTree_t *node) {
+    _clear_chk_node(node);
+    free(node->nodeData);
     return;
 }
 
@@ -73,7 +81,7 @@ static void _init_chk_node(_sparseTree_t *node) {
     nd->R = NULL;
     nd->nR = 0;
     node->nodeData = (void *)nd;
-    node->clear = _clear_chk_node;
+    node->clear = _clear_and_free_chk_node;
     return;
 }
 
@@ -715,6 +723,54 @@ static void _CHKPKE_keylist_clean(_chkpke_node_config_t *list) {
         head = next;
     }
     return;
+}
+
+int CHKPKE_Upd(CHKPKE_t chk, int64_t interval) {
+    _chkpke_node_config_t *keylist;
+    sparseTree_ptr_t node, parent, sibling;
+    int i;
+
+    // ensure all secrets derived for interval
+    //printf("Upd for interval %ld\n", interval);
+    keylist = _CHKPKE_keylist_for_interval(chk, interval);
+    if (keylist == NULL) return -1;
+
+    node = sparseTree_find_by_address(chk->tree, chk->depth, interval);
+    parent = node->parent;
+    //printf("node found = (%d, %ld)\n", node->depth, node->ordinal);
+
+    // clear secrets from parent and left-siblings, recurse up tree
+    // parent == NULL implies node is the tree root node
+    while (parent != NULL) {
+
+        //printf("clearing parent (%d, %ld), left from (%d, %ld)\n", parent->depth, parent->ordinal, node->depth, node->ordinal);
+
+        for (i = 0; i < chk->order; i++) {
+            // quit once we get to current node;
+            sibling = parent->child[i];
+            if (sibling == node) break;
+            if (sibling != NULL) {
+                // clearing sibling nodes also clears/frees allocated child nodes
+                //printf("deleting sibling (%d, %ld)\n", sibling->depth, sibling->ordinal);
+                sparseTree_clear(sibling);
+                parent->child[i] = (_sparseTree_t *)NULL;
+            }
+        }
+
+        // error if we didn't abort loop early
+        assert(i < chk->order);
+
+        // clear secrets for parent node
+        _clear_chk_node(parent);
+        node = parent;
+        parent = node->parent;
+    }
+    //printf("cleared all previous secrets\n");
+
+    //assert(node == chk->tree);
+    // clear the root node... all secrets can be derived from root secret
+    //_clear_chk_node(chk->tree);
+    return 0;
 }
 
 char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
@@ -1498,7 +1554,7 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     element_init_GT(chk->eQH, chk->pairing);
     element_pairing(chk->eQH, chk->Q, e_pt);
     chk->is_secret = false;
-    printf("pubkey init complete\n");
+    //printf("pubkey init complete\n");
     
     {
         int i;
@@ -1544,6 +1600,8 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
 
             sprintf(abuffer, "secrets.?%d.s", i);
             result = _asn1_read_mpECP_from_octet_string(ecp_pt, privkey_asn1, abuffer, chk->C);
+            // TODO: remove this assert
+            assert(result == 0);
             if (result != 0) {
                 mpECP_clear(ecp_pt);
                 goto error_cleanup3;
@@ -1554,6 +1612,8 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
             for (j = 0; j < depth; j++) {
                 sprintf(abuffer, "secrets.?%d.r.?%d", i, j + 1);
                 result = _asn1_read_mpECP_from_octet_string(ecp_pt, privkey_asn1, abuffer, chk->C);
+                // TODO: remove this assert
+                assert(result == 0);
                 if (result != 0) {
                     mpECP_clear(ecp_pt);
                     goto error_cleanup3;
@@ -1607,4 +1667,3 @@ error_cleanup1:
     asn1_delete_structure(&CHKPKE_asn1);
     return -1;
 }
-
