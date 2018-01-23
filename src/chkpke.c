@@ -660,8 +660,8 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
     // encode node + right from current level
     head = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
     next = head;
-    stop = (interval + chk->order - 1) / chk->order;
-    for (i = interval; i < (stop * chk->order); i++) {
+    stop = interval + (chk->order - (interval % chk->order));
+    for (i = interval; i < stop; i++) {
         //printf("node @ (%d, %ld)\n", depth, i);
         // must call _der_for_node to populate R,S in nodeData
         assert(_CHKPKE_der_for_node(chk, depth, i) == 0);
@@ -669,7 +669,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
         next->nd = (_chkpke_node_data_t *)node->nodeData;
         next->depth = depth;
         next->ordinal = i;
-        if ((i + 1) < (stop * chk->order)) {
+        if ((i + 1) < stop) {
             next->next = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
             next = next->next;
             next->next = (_chkpke_node_config_t *)NULL;
@@ -691,6 +691,15 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
         next->next = _CHKPKE_keylist_for_depth_interval(chk, dnext, onext);
     }
 
+    return head;
+}
+
+static _chkpke_node_config_t *_CHKPKE_keylist_for_interval(CHKPKE_t chk, int64_t interval) {
+    _chkpke_node_config_t *head;
+    //_chkpke_node_config_t *next;
+    //int64_t i;
+    head = _CHKPKE_keylist_for_depth_interval(chk, chk->depth, interval);
+
     //next = head;
     //printf("-- list out start --\n");
     //while (next != (_chkpke_node_config_t *)NULL) {
@@ -706,10 +715,6 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
     //printf("-- list out end --\n");
 
     return head;
-}
-
-static _chkpke_node_config_t *_CHKPKE_keylist_for_interval(CHKPKE_t chk, int64_t interval) {
-    return _CHKPKE_keylist_for_depth_interval(chk, chk->depth, interval);
 }
 
 static void _CHKPKE_keylist_clean(_chkpke_node_config_t *list) {
@@ -1668,7 +1673,7 @@ error_cleanup1:
     return -1;
 }
 
-char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval, int *sz) {
+char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -1743,7 +1748,7 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval, int *sz) {
     }
 
     element_pow_mpz(d, chk->eQH, lambda_mpz);
-    element_mul(Md , plaintext, d);
+    element_mul(Md , plain, d);
 
     ePtr = element_x(Md);
     element_to_mpz(lambda_mpz, ePtr);
@@ -1777,4 +1782,8 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval, int *sz) {
     asn1_delete_structure(&CHKPKE_asn1);
 
     return buffer;
+}
+
+int CHKPKE_Dec_Der(element_t plain, CHKPKE_t chk, char *cipher, int interval) {
+    assert(0);
 }

@@ -117,6 +117,45 @@ START_TEST(test_chkpke_export_pubkey_der)
     CHKPKE_clear(pke1);
 END_TEST
 
+START_TEST(test_chkpke_export_import_privkey_0_der)
+    CHKPKE_t pke1;
+    CHKPKE_t pke2;
+    int i;
+    int sz1;
+    int sz2;
+    unsigned char *der1;
+    unsigned char *der2;
+
+    //printf("generating key\n");
+    CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
+
+    //printf("exporting key\n");
+    der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, 0, &sz1);
+    assert(der1 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz1);
+    for (i = 0; i < sz1; i++) {
+        printf("%02X", der1[i]);
+    }
+    printf("\n");
+
+    i = CHKPKE_init_privkey_decode_DER(pke2, (char *)der1, sz1);
+    assert(i == 0);
+    der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, 0, &sz2);
+    assert(der2 != NULL);
+    //printf("DER encoded privkey (%d bytes)=\n", sz2);
+    assert(sz1 == sz2);
+    for (i = 0; i < sz2; i++) {
+        //printf("%02X", der2[i]);
+        assert(der1[i] == der2[i]);
+    }
+    //printf("\n");
+
+    free(der2);
+    free(der1);
+    CHKPKE_clear(pke2);
+    CHKPKE_clear(pke1);
+END_TEST
+
 START_TEST(test_chkpke_export_privkey_der)
     CHKPKE_t pke1;
     CHKPKE_t pke2;
@@ -265,7 +304,7 @@ START_TEST(test_chkpke_encode_message)
     //printf("\n");
     free(der2);
 
-    der2 = CHKPKE_Enc_DER(pke2, plaintext, 10, &sz2);
+    der2 = (unsigned char *)CHKPKE_Enc_DER(pke2, plaintext, randint(0, (1<<(6*4-1))), &sz2);
     assert(der2 != NULL);
     printf("DER encoded ciphertext (%d bytes)=\n", sz2);
     for (i = 0; i < sz2; i++) {
@@ -291,6 +330,7 @@ static Suite *CHKPKE_test_suite(void) {
     tcase_add_test(tc, test_chkpke_init);
     tcase_add_test(tc, test_chkpke_der);
     tcase_add_test(tc, test_chkpke_export_pubkey_der);
+    tcase_add_test(tc, test_chkpke_export_import_privkey_0_der);
     tcase_add_test(tc, test_chkpke_export_privkey_der);
     tcase_add_test(tc, test_chkpke_encode_message);
 

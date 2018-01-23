@@ -128,7 +128,13 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval);
 // memory once no longer in use. The message is encoded for a particular
 // interval. Once a private key is updated to a future interval the resulting
 // message cannot be decrypted.
-char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval, int *sz);
+char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz);
+
+// Dec_DER decodes an ASN1 DER encoded ciphertext into the original plaintext
+// element based on the private key material and the specific interval. Dec
+// returns 0 on success and -1 on error, e.g. if the key cannot be derived for
+// the specified interval.
+int CHKPKE_Dec_Der(element_t plain, CHKPKE_t chk, char *cipher, int interval);
 
 #ifdef __cplusplus
 }
