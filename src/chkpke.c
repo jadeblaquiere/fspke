@@ -1667,3 +1667,114 @@ error_cleanup1:
     asn1_delete_structure(&CHKPKE_asn1);
     return -1;
 }
+
+char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval, int *sz) {
+    ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
+    ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
+    char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
+    sparseTree_ptr_t node;
+    sparseTree_ptr_t pathnode;
+    element_t lambda;
+    element_t lambdaP;
+    element_t d;
+    element_t Md;
+    element_ptr ePtr;
+    mpECP_t ecp_pt;
+    mpz_t id;
+    mpz_t lambda_mpz;
+    int depth;
+    int sum, length;
+    int result;
+    char *buffer;
+
+    sum = 0;
+
+    result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+
+    if (result != 0) {
+        asn1_perror (result);
+        printf ("%s", asnError);
+        assert(result == 0);
+    }
+
+    // create an empty ASN1 structure
+    result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKCiphertext",
+        &ciphertext_asn1);
+    assert(result == 0);
+
+    printf("-----------------\n");
+    asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
+    printf("-----------------\n");
+
+    mpECP_init(ecp_pt);
+    element_init_Zr(lambda, chk->pairing);
+    element_init_G1(lambdaP, chk->pairing);
+    element_init_GT(d, chk->pairing);
+    element_init_GT(Md, chk->pairing);
+    mpz_init(id);
+    mpz_init(lambda_mpz);
+
+    // pbc pulls random values from /dev/urandom
+    element_random(lambda);
+    element_to_mpz(lambda_mpz, lambda);
+
+    element_mul(lambdaP, chk->P, lambda);
+    _mpECP_set_pbc_element(ecp_pt, lambdaP, chk->C);
+    sum += _asn1_write_mpECP_as_octet_string(ciphertext_asn1, "lP", ecp_pt);
+
+    node = sparseTree_find_by_address(chk->tree, chk->depth, interval);
+
+    for (depth = 1; depth <= chk->depth ; depth++) {
+
+        pathnode = node;
+        while (pathnode->depth > depth) {
+            pathnode = pathnode->parent;
+        }
+
+        printf("writing l*H for node (%d, %ld)\n", pathnode->depth, pathnode->ordinal);
+
+        _mpz_set_ull(id, sparseTree_node_id(pathnode));
+        icartHash_hashval(ecp_pt, chk->H, id);
+        mpECP_scalar_mul_mpz(ecp_pt, ecp_pt, lambda_mpz);
+        // Add a field to the SEQUENCE OF
+        result = asn1_write_value (ciphertext_asn1, "lHw", "NEW", 1);
+        assert(result == 0);
+        sum += _asn1_write_mpECP_as_octet_string(ciphertext_asn1, "lHw.?LAST", ecp_pt);
+    }
+
+    element_pow_mpz(d, chk->eQH, lambda_mpz);
+    element_mul(Md , plaintext, d);
+
+    ePtr = element_x(Md);
+    element_to_mpz(lambda_mpz, ePtr);
+    sum += _asn1_write_mpz_as_octet_string(ciphertext_asn1, "md.x", lambda_mpz);
+
+    ePtr = element_y(Md);
+    element_to_mpz(lambda_mpz, ePtr);
+    sum += _asn1_write_mpz_as_octet_string(ciphertext_asn1, "md.y", lambda_mpz);
+
+    printf("-----------------\n");
+    asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
+    printf("-----------------\n");
+
+    // validate export
+    sum += 256;  // pad for DER header + some extra just in case
+    length = sum;
+    buffer = (char *)malloc((sum) * sizeof(char));
+    result = asn1_der_coding(ciphertext_asn1, "", buffer, &length, asnError);
+    assert(result == 0);
+    assert(length < sum);
+    *sz = length;
+
+    mpz_clear(lambda_mpz);
+    mpz_clear(id);
+    element_clear(Md);
+    element_clear(d);
+    element_clear(lambdaP);
+    element_clear(lambda);
+    mpECP_clear(ecp_pt);
+    asn1_delete_structure(&ciphertext_asn1);
+    asn1_delete_structure(&CHKPKE_asn1);
+
+    return buffer;
+}

@@ -220,6 +220,67 @@ START_TEST(test_chkpke_export_privkey_der)
     CHKPKE_clear(pke1);
 END_TEST
 
+START_TEST(test_chkpke_encode_message)
+    CHKPKE_t pke1, pke2;
+    int i;
+    int sz1, sz2;
+    unsigned char *der1, *der2;
+    element_t plaintext;
+    element_ptr ePtr;
+    mpz_t x,y;
+
+    mpz_init(x);
+    mpz_init(y);
+
+    CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
+
+    element_init_GT(plaintext, pke1->pairing);
+    element_random(plaintext);
+    ePtr = element_x(plaintext);
+    element_to_mpz(x, ePtr);
+    ePtr = element_y(plaintext);
+    element_to_mpz(y, ePtr);
+
+    gmp_printf("random secret = (0x%ZX, 0x%ZX)\n", x, y);
+
+    der1 = (unsigned char *)CHKPKE_pubkey_encode_DER(pke1, &sz1);
+    assert(der1 != NULL);
+    printf("DER encoded pubkey (%d bytes)=\n", sz1);
+    for (i = 0; i < sz1; i++) {
+        printf("%02X", der1[i]);
+    }
+    printf("\n");
+
+    i = CHKPKE_init_pubkey_decode_DER(pke2, (char *)der1, sz1);
+    assert(i == 0);
+
+    der2 = (unsigned char *)CHKPKE_pubkey_encode_DER(pke2, &sz2);
+    assert(der2 != NULL);
+    //printf("DER encoded pubkey (%d bytes)=\n", sz2);
+    assert(sz1 == sz2);
+    for (i = 0; i < sz2; i++) {
+        //printf("%02X", der2[i]);
+        assert(der1[i] == der2[i]);
+    }
+    //printf("\n");
+    free(der2);
+
+    der2 = CHKPKE_Enc_DER(pke2, plaintext, 10, &sz2);
+    assert(der2 != NULL);
+    printf("DER encoded ciphertext (%d bytes)=\n", sz2);
+    for (i = 0; i < sz2; i++) {
+        printf("%02X", der2[i]);
+    }
+    printf("\n");
+
+    free(der2);
+    free(der1);
+    CHKPKE_clear(pke2);
+    CHKPKE_clear(pke1);
+    mpz_clear(y);
+    mpz_clear(x);
+END_TEST
+
 static Suite *CHKPKE_test_suite(void) {
     Suite *s;
     TCase *tc;
@@ -231,6 +292,7 @@ static Suite *CHKPKE_test_suite(void) {
     tcase_add_test(tc, test_chkpke_der);
     tcase_add_test(tc, test_chkpke_export_pubkey_der);
     tcase_add_test(tc, test_chkpke_export_privkey_der);
+    tcase_add_test(tc, test_chkpke_encode_message);
 
     // set 10 second timeout instead of default 4
     tcase_set_timeout(tc, 10.0);

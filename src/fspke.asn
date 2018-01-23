@@ -67,4 +67,10 @@ CarterWegmanHash ::= SEQUENCE {
     b       OCTET STRING
 }
 
+CHKCiphertext ::= SEQUENCE {
+    lP      OCTET STRING,
+    lHw     SEQUENCE OF OCTET STRING,
+    md      CurvePoint
+}
+
 END

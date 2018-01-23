@@ -123,12 +123,12 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval);
 // Enc_DER uses the public key attributes to encode a plaintext message into a
 // ciphertext. The "plaintext" message in this case is an element of Fp2 and
 // the resulting ciphertext is a combination of Elliptic curve points in E(Fp)
-// along with an element in Fp2. Enc_DER returns a DER encoded byte buffer
+// along with an element in Fp2. Enc_DER returns a ASN1 DER encoded byte buffer
 // containing the ciphertext - the caller must use free() to release that
 // memory once no longer in use. The message is encoded for a particular
 // interval. Once a private key is updated to a future interval the resulting
 // message cannot be decrypted.
-char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval);
+char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plaintext, int interval, int *sz);
 
 #ifdef __cplusplus
 }
