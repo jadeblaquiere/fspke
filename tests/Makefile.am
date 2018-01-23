@@ -1,5 +1,5 @@
 noinst_PROGRAMS = test_chkpke test_cwhash test_icarthash test_sparsetree
-TESTS = test_cwhash test_icarthash test_sparsetree
+TESTS = test_cwhash test_icarthash test_sparsetree test_chkpke
 
 test_chkpke_SOURCES = test_chkpke.c
 test_chkpke_CFLAGS = -Wall -I ../include -I /usr/include/pbc $(CFLAGS) $(CHECK_CFLAGS)
