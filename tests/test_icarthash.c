@@ -142,6 +142,8 @@ static Suite *iHash_test_suite(void) {
     
     s = suite_create("Icart {0,1}N->E(Fp) Universal Hash Family");
     tc = tcase_create("arithmetic");
+    // set 10 second timeout instead of default 4
+    tcase_set_timeout(tc, 10.0);
 
     tcase_add_test(tc, test_ih_urandom);
     suite_add_tcase(s, tc);
