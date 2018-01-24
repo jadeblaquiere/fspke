@@ -156,6 +156,45 @@ START_TEST(test_chkpke_export_import_privkey_0_der)
     CHKPKE_clear(pke1);
 END_TEST
 
+START_TEST(test_chkpke_export_import_privkey_last_der)
+    CHKPKE_t pke1;
+    CHKPKE_t pke2;
+    int i;
+    int sz1;
+    int sz2;
+    unsigned char *der1;
+    unsigned char *der2;
+
+    //printf("generating key\n");
+    CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
+
+    //printf("exporting key\n");
+    der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, (1<<(6*4-1)) - 1, &sz1);
+    assert(der1 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz1);
+    for (i = 0; i < sz1; i++) {
+        printf("%02X", der1[i]);
+    }
+    printf("\n");
+
+    i = CHKPKE_init_privkey_decode_DER(pke2, (char *)der1, sz1);
+    assert(i == 0);
+    der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, (1<<(6*4-1)) - 1, &sz2);
+    assert(der2 != NULL);
+    //printf("DER encoded privkey (%d bytes)=\n", sz2);
+    assert(sz1 == sz2);
+    for (i = 0; i < sz2; i++) {
+        //printf("%02X", der2[i]);
+        assert(der1[i] == der2[i]);
+    }
+    //printf("\n");
+
+    free(der2);
+    free(der1);
+    CHKPKE_clear(pke2);
+    CHKPKE_clear(pke1);
+END_TEST
+
 START_TEST(test_chkpke_export_privkey_der)
     CHKPKE_t pke1;
     CHKPKE_t pke2;
@@ -261,10 +300,12 @@ END_TEST
 
 START_TEST(test_chkpke_encode_message)
     CHKPKE_t pke1, pke2;
-    int i;
+    int i, result;
+    int64_t interval;
     int sz1, sz2;
     unsigned char *der1, *der2;
     element_t plaintext;
+    element_t plaincopy;
     element_ptr ePtr;
     mpz_t x,y;
 
@@ -304,7 +345,8 @@ START_TEST(test_chkpke_encode_message)
     //printf("\n");
     free(der2);
 
-    der2 = (unsigned char *)CHKPKE_Enc_DER(pke2, plaintext, randint(0, (1<<(6*4-1))), &sz2);
+    interval = randint(0, (1<<(6*4-1)));
+    der2 = (unsigned char *)CHKPKE_Enc_DER(pke2, plaintext, interval, &sz2);
     assert(der2 != NULL);
     printf("DER encoded ciphertext (%d bytes)=\n", sz2);
     for (i = 0; i < sz2; i++) {
@@ -312,12 +354,27 @@ START_TEST(test_chkpke_encode_message)
     }
     printf("\n");
 
+    element_init_GT(plaincopy, pke1->pairing);
+
+    result = CHKPKE_Dec_DER(plaincopy, pke1, (char *)der2, sz2, interval);
+    assert(result == 0);
+    ePtr = element_x(plaincopy);
+    element_to_mpz(x, ePtr);
+    ePtr = element_y(plaincopy);
+    element_to_mpz(y, ePtr);
+
+    gmp_printf("decoded secret = (0x%ZX, 0x%ZX)\n", x, y);
+
+    assert(element_cmp(plaintext, plaincopy) == 0);
+
     free(der2);
     free(der1);
-    CHKPKE_clear(pke2);
-    CHKPKE_clear(pke1);
+    element_clear(plaincopy);
+    element_clear(plaintext);
     mpz_clear(y);
     mpz_clear(x);
+    CHKPKE_clear(pke2);
+    CHKPKE_clear(pke1);
 END_TEST
 
 static Suite *CHKPKE_test_suite(void) {
@@ -331,6 +388,7 @@ static Suite *CHKPKE_test_suite(void) {
     tcase_add_test(tc, test_chkpke_der);
     tcase_add_test(tc, test_chkpke_export_pubkey_der);
     tcase_add_test(tc, test_chkpke_export_import_privkey_0_der);
+    tcase_add_test(tc, test_chkpke_export_import_privkey_last_der);
     tcase_add_test(tc, test_chkpke_export_privkey_der);
     tcase_add_test(tc, test_chkpke_encode_message);
 

@@ -134,7 +134,7 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz);
 // element based on the private key material and the specific interval. Dec
 // returns 0 on success and -1 on error, e.g. if the key cannot be derived for
 // the specified interval.
-int CHKPKE_Dec_Der(element_t plain, CHKPKE_t chk, char *cipher, int interval);
+int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int interval);
 
 #ifdef __cplusplus
 }

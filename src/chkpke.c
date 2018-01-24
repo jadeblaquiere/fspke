@@ -311,7 +311,7 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     nd->S = (element_ptr)malloc(sizeof(element_t));
     //printf("writing secret to node(0)\n");
     element_init_G1(nd->S, chk->pairing);
-    element_mul(nd->S, e_pt, alpha);
+    element_mul_zn(nd->S, e_pt, alpha);
     element_clear(e_pt);
     element_clear(alpha);
     return;
@@ -1207,6 +1207,7 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
 
     // read DER into ASN1 structure
     result = asn1_der_decoding(&pubkey_asn1, der, sz, asnError);
+    if (result != ASN1_SUCCESS) return -1;
 
     //printf("-----------------\n");
     //asn1_print_structure(stdout, pubkey_asn1, "", ASN1_PRINT_ALL);
@@ -1417,6 +1418,7 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
 
     // read DER into ASN1 structure
     result = asn1_der_decoding(&privkey_asn1, der, sz, asnError);
+    if (result != ASN1_SUCCESS) return -1;
 
     //printf("-----------------\n");
     //asn1_print_structure(stdout, privkey_asn1, "", ASN1_PRINT_ALL);
@@ -1707,9 +1709,9 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz) {
         &ciphertext_asn1);
     assert(result == 0);
 
-    printf("-----------------\n");
-    asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
-    printf("-----------------\n");
+    //printf("-----------------\n");
+    //asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
+    //printf("-----------------\n");
 
     mpECP_init(ecp_pt);
     element_init_Zr(lambda, chk->pairing);
@@ -1723,9 +1725,11 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz) {
     element_random(lambda);
     element_to_mpz(lambda_mpz, lambda);
 
-    element_mul(lambdaP, chk->P, lambda);
+    result = asn1_write_value (ciphertext_asn1, "u", "NEW", 1);
+    assert(result == 0);
+    element_mul_zn(lambdaP, chk->P, lambda);
     _mpECP_set_pbc_element(ecp_pt, lambdaP, chk->C);
-    sum += _asn1_write_mpECP_as_octet_string(ciphertext_asn1, "lP", ecp_pt);
+    sum += _asn1_write_mpECP_as_octet_string(ciphertext_asn1, "u.?LAST", ecp_pt);
 
     node = sparseTree_find_by_address(chk->tree, chk->depth, interval);
 
@@ -1736,15 +1740,15 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz) {
             pathnode = pathnode->parent;
         }
 
-        printf("writing l*H for node (%d, %ld)\n", pathnode->depth, pathnode->ordinal);
+        //printf("writing l*H for node (%d, %ld)\n", pathnode->depth, pathnode->ordinal);
 
         _mpz_set_ull(id, sparseTree_node_id(pathnode));
         icartHash_hashval(ecp_pt, chk->H, id);
         mpECP_scalar_mul_mpz(ecp_pt, ecp_pt, lambda_mpz);
         // Add a field to the SEQUENCE OF
-        result = asn1_write_value (ciphertext_asn1, "lHw", "NEW", 1);
+        result = asn1_write_value (ciphertext_asn1, "u", "NEW", 1);
         assert(result == 0);
-        sum += _asn1_write_mpECP_as_octet_string(ciphertext_asn1, "lHw.?LAST", ecp_pt);
+        sum += _asn1_write_mpECP_as_octet_string(ciphertext_asn1, "u.?LAST", ecp_pt);
     }
 
     element_pow_mpz(d, chk->eQH, lambda_mpz);
@@ -1752,15 +1756,15 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz) {
 
     ePtr = element_x(Md);
     element_to_mpz(lambda_mpz, ePtr);
-    sum += _asn1_write_mpz_as_octet_string(ciphertext_asn1, "md.x", lambda_mpz);
+    sum += _asn1_write_mpz_as_octet_string(ciphertext_asn1, "v.x", lambda_mpz);
 
     ePtr = element_y(Md);
     element_to_mpz(lambda_mpz, ePtr);
-    sum += _asn1_write_mpz_as_octet_string(ciphertext_asn1, "md.y", lambda_mpz);
+    sum += _asn1_write_mpz_as_octet_string(ciphertext_asn1, "v.y", lambda_mpz);
 
-    printf("-----------------\n");
-    asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
-    printf("-----------------\n");
+    //printf("-----------------\n");
+    //asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
+    //printf("-----------------\n");
 
     // validate export
     sum += 256;  // pad for DER header + some extra just in case
@@ -1784,6 +1788,203 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz) {
     return buffer;
 }
 
-int CHKPKE_Dec_Der(element_t plain, CHKPKE_t chk, char *cipher, int interval) {
-    assert(0);
+static int _asn1_read_element_gt_from_xy(element_t value, asn1_node root, char *attribute) {
+    int result, length, lread, len, len_element;
+    char *buffer, *abuffer;
+
+    len = strlen(attribute) + 5;
+    abuffer = (char *)malloc((len + 1)*sizeof(char));
+
+    // call read_value with NULL buffer to get length
+    strncpy(abuffer, attribute, len);
+    strncat(abuffer, ".x", 5);
+    length = 0;
+    result = asn1_read_value(root, abuffer, NULL, &length);
+    //printf("result = %d\n", result);
+    if (result != ASN1_MEM_ERROR) return -1;
+    //assert(result == ASN1_MEM_ERROR);
+    if (length <= 0) return -1;
+    //assert(length > 0);
+    // allocate
+    len_element = element_length_in_bytes(value) >> 1;
+    //printf("length string = %d, length element expected = %d\n", length, len_element);
+    assert(len_element >= length);
+    //printf("allocating space for 2x %d-bit x,y values\n", (length * 8));
+    buffer = (char *)malloc(((len_element * 2) + 1)*sizeof(char));
+    bzero(buffer, len_element * 2);
+
+    lread = length + 1;
+    result = asn1_read_value(root, abuffer, &buffer[len_element-length], &lread);
+    if (result != ASN1_SUCCESS) return -1;
+    //printf("read X\n");
+    //assert(result == 0);
+    if (lread != length) return -1;
+    //assert(lread == length);
+    //{
+    //    int i;
+    //    printf("read X (%s) as :", abuffer);
+    //    for (i = 0; i < len_element; i++) {
+    //        printf("%02X", (unsigned char)buffer[i]);
+    //    }
+    //    printf("\n");
+    //}
+
+    strncpy(abuffer, attribute, len);
+    strncat(abuffer, ".y", 5);
+    length = 0;
+    result = asn1_read_value(root, abuffer, NULL, &length);
+    //printf("result = %d\n", result);
+    if (result != ASN1_MEM_ERROR) return -1;
+    //assert(result == ASN1_MEM_ERROR);
+    if (length <= 0) return -1;
+    //assert(length > 0);
+    assert(len_element >= length);
+    lread = length + 1;
+    result = asn1_read_value(root, abuffer, &buffer[(2*len_element)-length], &lread);
+    if (result != ASN1_SUCCESS) return -1;
+    //printf("read Y\n");
+    //assert(result == 0);
+    if (lread != length) return -1;
+    //assert(lread == length);
+    //{
+    //    int i;
+    //    printf("read Y (%s) as :", abuffer);
+    //    for (i = 0; i < len_element; i++) {
+    //        printf("%02X", (unsigned char)buffer[i+length]);
+    //    }
+    //    printf("\n");
+    //}
+
+    element_from_bytes(value, (unsigned char*)buffer);
+    //element_printf("GT: %B\n", value);
+    free(buffer);
+    free(abuffer);
+    return 0;
+}
+
+int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int interval) {
+    ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
+    ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
+    char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
+    int i, result;
+    sparseTree_ptr_t node;
+    _chkpke_node_data_t *nd;
+    char abuffer[80];
+    mpz_t rmin1, x, y;
+
+    mpECP_t ecp_pt;
+    element_t e_pt, e_gt, eU0Sw, pi;
+
+    // ensure we can derive the secrets for the chosen interval
+    result = CHKPKE_Der(chk, interval);
+    if (result != 0) return -1;
+
+    // validate that we have the expected secret material
+    node = sparseTree_find_by_address(chk->tree, chk->depth, interval);
+    nd = (_chkpke_node_data_t *)node->nodeData;
+    assert(nd->S != NULL);
+    assert(nd->R != NULL);
+    assert(nd->nR == chk->depth);
+
+    result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+
+    if (result != 0) {
+        asn1_perror (result);
+        printf ("%s", asnError);
+        assert(result == 0);
+    }
+
+    // create an empty ASN1 structure
+    result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKCiphertext",
+        &ciphertext_asn1);
+    assert(result == 0);
+
+    //printf("-----------------\n");
+    //asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
+    //printf("-----------------\n");
+
+    // read DER into ASN1 structure
+    result = asn1_der_decoding(&ciphertext_asn1, cipher, sz, asnError);
+    if (result != ASN1_SUCCESS) return -1;
+
+    //printf("-----------------\n");
+    //asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
+    //printf("-----------------\n");
+
+    mpECP_init(ecp_pt);
+    element_init_G1(e_pt, chk->pairing);
+    element_init_GT(e_gt, chk->pairing);
+    element_init_GT(eU0Sw, chk->pairing);
+    element_init_GT(pi, chk->pairing);
+    mpz_init(rmin1);
+    mpz_init(x);
+    mpz_init(y);
+
+    //printf("read U0\n");
+    result = _asn1_read_mpECP_from_octet_string(ecp_pt, ciphertext_asn1, "u.?1", chk->C);
+    if (result != 0) goto error_cleanup1;
+    _pbc_element_set_mpECP(e_pt, ecp_pt, chk->pairing);
+
+    //("calc pairing eU0Sw\n");
+    // caluclate e(U0, Sw), where U0 = lambda * P
+    element_pairing(eU0Sw, e_pt, nd->S);
+
+    //printf("read U1\n");
+    result = _asn1_read_mpECP_from_octet_string(ecp_pt, ciphertext_asn1, "u.?2", chk->C);
+    if (result != 0) goto error_cleanup1;
+    _pbc_element_set_mpECP(e_pt, ecp_pt, chk->pairing);
+
+    // calculate product PI(e(Rwi-1, Ui), where Ui = lHwi
+    element_pairing(pi, &(nd->R[0]), e_pt);
+    for (i = 2; i <= chk->depth; i++) {
+        sprintf(abuffer, "u.?%d", i+1);
+        //printf("read U%d\n", i);
+        result = _asn1_read_mpECP_from_octet_string(ecp_pt, ciphertext_asn1, abuffer, chk->C);
+        if (result != 0) goto error_cleanup1;
+        _pbc_element_set_mpECP(e_pt, ecp_pt, chk->pairing);
+
+        element_pairing(e_gt, &(nd->R[i-1]), e_pt);
+        element_mul(pi, pi, e_gt);
+    }
+
+    //printf("invert pi\n");
+    // invert numerator term
+    mpz_sub_ui(rmin1, chk->r, 1);
+    element_pow_mpz(eU0Sw, eU0Sw, rmin1);
+
+    //printf("mul eU0Sw * pi**-1\n");
+    // d = e(U0, Sw) / PI() = e(U0, Sw) * PI() ** (r-1)
+    // d ** -1 = e(U0, Sw) ** -1 * PI()
+    element_mul(eU0Sw, eU0Sw, pi);
+
+    //printf("read V (M * d)\n");
+    // V = M*d
+    result = _asn1_read_element_gt_from_xy(e_gt, ciphertext_asn1, "v");
+    if (result != 0) goto error_cleanup1;
+
+    //printf("and... dismount\n");
+    // decrypt M = V * d**-1 = = V / d = V / ( eU0Sw / PI_i=1..n(Rwi-1, Ui) )
+    element_mul(plain, e_gt, eU0Sw);
+
+    mpz_clear(y);
+    mpz_clear(x);
+    mpz_clear(rmin1);
+    element_clear(pi);
+    element_clear(eU0Sw);
+    element_clear(e_gt);
+    element_clear(e_pt);
+    mpECP_clear(ecp_pt);
+
+    return 0;
+
+error_cleanup1:
+    mpz_clear(y);
+    mpz_clear(x);
+    mpz_clear(rmin1);
+    element_clear(pi);
+    element_clear(eU0Sw);
+    element_clear(e_gt);
+    element_clear(e_pt);
+    mpECP_clear(ecp_pt);
+    return -1;
 }
