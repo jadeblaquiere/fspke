@@ -110,8 +110,8 @@ static void _CHKPKE_extract_a_params(CHKPKE_t chk) {
     chk->p_sign0 = p->sign0;
     // validate params
     // q, r prime?
-    assert(mpz_probab_prime_p(chk->q,10));
-    assert(mpz_probab_prime_p(chk->r,10));
+    assert(mpz_probab_prime_p(chk->q,20));
+    assert(mpz_probab_prime_p(chk->r,20));
     {
         // r * h == q + 1 ? ( as r * h - 1 == q ? )
         mpz_t acc, t;

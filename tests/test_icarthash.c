@@ -122,6 +122,63 @@ START_TEST(test_ih_urandom)
             printf("Hash : %s\n\n", buffer);
             assert(strlen(buffer) == slen);
             if (!A->is_neutral) assert(mpECurve_point_check(cv, x, y));
+            free(buffer);
+        }
+    }
+
+    icartHash_clear(ih_cp);
+    icartHash_clear(ih);
+    mpECurve_clear(cv);
+    mpECP_clear(B);
+    mpECP_clear(A);
+    mpz_clear(y);
+    mpz_clear(x);
+    mpz_clear(b);
+    mpz_clear(a);
+END_TEST
+
+START_TEST(test_ih_first20)
+    int i, j, slen, ncurves;
+    char *buffer;
+    mpz_t a, b, x, y;
+    mpECP_t A;
+    mpECP_t B;
+    mpECurve_t cv;
+    icartHash_t ih;
+    icartHash_t ih_cp;
+    mpz_init(a);
+    mpz_init(b);
+    mpz_init(x);
+    mpz_init(y);
+    mpECP_init(A);
+    mpECP_init(B);
+    mpECurve_init(cv);
+    icartHash_init(ih);
+    icartHash_init(ih_cp);
+
+    ncurves = sizeof(test_curve)/sizeof(test_curve[0]);
+    for (i = 0; i < ncurves; i++) {
+        mpECurve_set_str_ws(cv, test_curve[i].p, test_curve[i].a, test_curve[i].b, test_curve[i].n, test_curve[i].h, test_curve[i].Gx, test_curve[i].Gy, test_curve[i].bits);
+        icartHash_urandom(ih, cv);
+        icartHash_set(ih_cp, ih);
+        for (j = 0; j < 20; j++) {
+            mpz_set_ui(a, j);
+            mpz_set(b, a);
+            icartHash_hashval(A, ih, a);
+            icartHash_hashval(B, ih_cp, b);
+            assert(mpz_cmp(a, b) == 0);
+            assert(mpECP_cmp(A, B) == 0);
+            mpz_set_mpECP_affine_x(x, A);
+            mpz_set_mpECP_affine_y(y, A);
+            slen = mpECP_out_strlen(A, 0);
+            buffer = malloc((slen + 1)* sizeof(char));
+            assert(buffer != NULL);
+            mpECP_out_str(buffer, A, 0);
+            gmp_printf("A :   %ZX\n", a);
+            printf("Hash : %s\n\n", buffer);
+            assert(strlen(buffer) == slen);
+            if (!A->is_neutral) assert(mpECurve_point_check(cv, x, y));
+            free(buffer);
         }
     }
 
@@ -146,6 +203,7 @@ static Suite *iHash_test_suite(void) {
     tcase_set_timeout(tc, 10.0);
 
     tcase_add_test(tc, test_ih_urandom);
+    tcase_add_test(tc, test_ih_first20);
     suite_add_tcase(s, tc);
     return s;
 }

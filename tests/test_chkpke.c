@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <check.h>
 #include <chkpke.h>
+#include <gmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -52,16 +53,67 @@ static int randint(int min, int max) {
     return min + (value % range);
 }
 
+static void _validate_curve_params(CHKPKE_t chk) {
+    // q, r prime?
+    assert(mpz_probab_prime_p(chk->q, 20) >= 0);
+    assert(mpz_probab_prime_p(chk->q, 20) >= 0);
+    // q + 1 = r * h
+    {
+        mpz_t t;
+        mpz_init(t);
+        mpz_mul(t, chk->r, chk->h);
+        mpz_sub_ui(t, t, 1);
+        assert(mpz_cmp(t, chk->q) == 0);
+        mpz_clear(t);
+    }
+    // P, Q are on curve
+    {
+        mpz_t x;
+        mpz_t y;
+        element_ptr t;
+        mpz_init(x);
+        mpz_init(y);
+        t = element_x(chk->P);
+        element_to_mpz(x, t);
+        t = element_y(chk->P);
+        element_to_mpz(y, t);
+        assert(mpECurve_point_check(chk->C, x, y) == true);
+        t = element_x(chk->Q);
+        element_to_mpz(x, t);
+        t = element_y(chk->Q);
+        element_to_mpz(y, t);
+        assert(mpECurve_point_check(chk->C, x, y) == true);
+        mpz_clear(y);
+        mpz_clear(x);
+    }
+    // order(P) = order(Q) = r
+    // r * P == O (the identity element)
+    {
+        element_t t;
+        element_init_G1(t, chk->pairing);
+        element_mul_mpz(t, chk->P, chk->r);
+        assert(element_is0(t));
+        element_init_G1(t, chk->pairing);
+        element_mul_mpz(t, chk->Q, chk->r);
+        assert(element_is0(t));
+        element_clear(t);
+    }
+}
+
 START_TEST(test_chkpke_init)
     CHKPKE_t pke;
     
     CHKPKE_init_Gen(pke, 512, 384, 4, 8);
+    _validate_curve_params(pke);
     CHKPKE_clear(pke);
     CHKPKE_init_Gen(pke, 256, 192, 4, 8);
+    _validate_curve_params(pke);
     CHKPKE_clear(pke);
     CHKPKE_init_Gen(pke, 128, 96, 4, 8);
+    _validate_curve_params(pke);
     CHKPKE_clear(pke);
     CHKPKE_init_Gen(pke, 64, 48, 4, 8);
+    _validate_curve_params(pke);
     CHKPKE_clear(pke);
 END_TEST
 
