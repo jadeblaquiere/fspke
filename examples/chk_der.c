@@ -39,10 +39,12 @@
 
 int main(int argc, char **argv) {
     char *filename = NULL;
+    int interval = 0;
     FILE *fPtr = stdin;
     poptContext pc;
     struct poptOption po[] = {
         {"file", 'f', POPT_ARG_STRING, &filename, 0, "read input from filepath instead of stdin", "file path"},
+        {"interval", 'i', POPT_ARG_INT, &interval, 0, "set interval for output key, default = 0", "interval"},
         POPT_AUTOHELP
         {NULL}
     };
@@ -92,10 +94,13 @@ int main(int argc, char **argv) {
 
     // export pubkey
     free(der);
-    der = CHKPKE_pubkey_encode_DER(pke, &sz);
-    assert(der != NULL);
+    der = CHKPKE_privkey_encode_DER(pke, interval, &sz);
+    if (der == NULL) {
+        fprintf(stderr, "<ValueError>: Unable to derive key for interval\n");
+        exit(1);
+    }
 
-    result = write_b64wrapped_to_file(stdout, der, sz, "CHK PUBLIC KEY");
+    result = write_b64wrapped_to_file(stdout, der, sz, "CHK PRIVATE KEY");
     if (result != 0) {
         fprintf(stderr, "<WriteError>: Error writing output\n");
         exit(1);

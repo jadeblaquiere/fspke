@@ -1,4 +1,4 @@
-noinst_PROGRAMS = chk_gen chk_pub
+noinst_PROGRAMS = chk_gen chk_pub chk_der
 
 chk_gen_SOURCES = chk_gen.c b64file.c
 chk_gen_CFLAGS = -Wall -I ../include -I /usr/include/pbc $(CFLAGS)
@@ -7,3 +7,7 @@ chk_gen_LDADD = -L../src/.libs/ -lfspke -lecc -lgmp -lpbc -ltasn1 -lpopt -lb64 $
 chk_pub_SOURCES = chk_pub.c b64file.c
 chk_pub_CFLAGS = -Wall -I ../include -I /usr/include/pbc $(CFLAGS)
 chk_pub_LDADD = -L../src/.libs/ -lfspke -lecc -lgmp -lpbc -ltasn1 -lpopt -lb64 $(LDFLAGS)
+
+chk_der_SOURCES = chk_der.c b64file.c
+chk_der_CFLAGS = -Wall -I ../include -I /usr/include/pbc $(CFLAGS)
+chk_der_LDADD = -L../src/.libs/ -lfspke -lecc -lgmp -lpbc -ltasn1 -lpopt -lb64 $(LDFLAGS)
