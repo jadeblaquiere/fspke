@@ -270,7 +270,7 @@ START_TEST(test_chkpke_export_privkey_der)
     //printf("exporting key\n");
     der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval, &sz1);
     assert(der1 != NULL);
-    printf("DER encoded privkey (%d bytes)=\n", sz1);
+    printf("DER encoded privkey 1 (%d bytes)=\n", sz1);
     for (i = 0; i < sz1; i++) {
         printf("%02X", der1[i]);
     }
@@ -295,7 +295,7 @@ START_TEST(test_chkpke_export_privkey_der)
     // derive key from original key
     der3 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval - 1, &sz3);
     assert(der3 != NULL);
-    printf("DER encoded privkey (%d bytes)=\n", sz3);
+    printf("DER encoded privkey 3 (%d bytes)=\n", sz3);
     for (i = 0; i < sz3; i++) {
         printf("%02X", der3[i]);
     }
@@ -305,7 +305,7 @@ START_TEST(test_chkpke_export_privkey_der)
     assert(i == 0);
     der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke3, interval, &sz4);
     assert(der4 != NULL);
-    //printf("DER encoded privkey (%d bytes)=\n", sz4);
+    //printf("DER encoded privkey 4(i) (%d bytes)=\n", sz4);
     assert(sz1 == sz4);
     for (i = 0; i < sz4; i++) {
         //printf("%02X", der4[i]);
@@ -316,7 +316,7 @@ START_TEST(test_chkpke_export_privkey_der)
     free(der4);
     der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke3, interval-1, &sz4);
     assert(der4 != NULL);
-    //printf("DER encoded privkey (%d bytes)=\n", sz4);
+    //printf("DER encoded privkey 4(i-1) (%d bytes)=\n", sz4);
     assert(sz3 == sz4);
     for (i = 0; i < sz4; i++) {
         //printf("%02X", der4[i]);
