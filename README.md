@@ -21,3 +21,22 @@ This implementation relies on the excellent work of several others:
 There are <examples> provided which are intended to illustrate how the library
 can be used to generate keypairs, update private keys and then use these keys
 to encode and decode messages.
+
+# Building the library
+
+The build process is implemented using GNU autotools, so it should in theory
+be portable to generally any common platform. There are a number of prerequisite
+libraries which are used as a basis for implementation (e.g. gmp, pbc,
+libtasn1, ecclib). The build process requires autotools and check (for unit testing).
+The examples also require popt, libb64 and libsodium. There is a script called
+<setup.sh> which will install all of these dependencies on a Ubuntu 14.04 platform.
+Once you have all of these dependencies installed you should be able to build the
+library and examples using something *like* the following commands:
+
+    ```
+    autoreconf --install
+    ./configure --prefix=/usr --enable-examples
+    make clean
+    make
+    sudo make install
+    ```
