@@ -21,4 +21,3 @@ This implementation relies on the excellent work of several others:
 There are <examples> provided which are intended to illustrate how the library
 can be used to generate keypairs, update private keys and then use these keys
 to encode and decode messages.
-s
