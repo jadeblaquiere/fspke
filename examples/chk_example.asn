@@ -33,9 +33,14 @@ ExampleMessageFormat DEFINITIONS EXPLICIT TAGS ::=
 BEGIN
 
 Message ::= SEQUENCE {
-    kex         OCTET STRING,
-    interval    INTEGER,
-    ctext       OCTET STRING
+    ctext       OCTET STRING,
+    ad          AdditionalData
+}
+
+AdditionalData ::= SEQUENCE {
+    enckey      OCTET STRING,
+    nonce       OCTET STRING,
+    interval    INTEGER
 }
 
 END

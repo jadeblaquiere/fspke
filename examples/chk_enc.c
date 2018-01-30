@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     };
     CHKPKE_t pke;
     char *der;
-    int sz, result;
+    int sz, bufsz, result;
     element_t shared_element;
     unsigned char shared_hash[crypto_aead_chacha20poly1305_KEYBYTES];
     unsigned char nonce[crypto_aead_chacha20poly1305_NPUBBYTES];
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
     // read key in ASN1 DER format from key file
     der = read_b64wrapped_from_file(kPtr, "CHK PUBLIC KEY", &sz);
     if (der == NULL) {
-        fprintf(stderr,"<ParseError>: unable to decode b64 PUBLIV KEY data\n");
+        fprintf(stderr,"<ParseError>: unable to decode b64 PUBLIC KEY data\n");
         exit(1);
     }
 
@@ -214,23 +214,6 @@ int main(int argc, char **argv) {
     assert(msg != NULL);
     assert(msglen > 0);
 
-    // symmetric encryption using libsodium combo AEAD routine:
-    //crypto_aead_chacha20poly1305_encrypt(unsigned char *c,
-    //                                           unsigned long long *clen,
-    //                                           const unsigned char *m,
-    //                                           unsigned long long mlen,
-    //                                           const unsigned char *ad,
-    //                                           unsigned long long adlen,
-    //                                           const unsigned char *nsec,
-    //                                           const unsigned char *npub,
-    //                                           const unsigned char *k);
-
-    // AEAD symmetric encryption with shared key, MAC covers both message and
-    // encrypted shared key (in der).
-    result = crypto_aead_chacha20poly1305_encrypt(ctext, &clen, msg,
-        msglen, (unsigned char *)der, sz, NULL, nonce, shared_hash);
-    assert(result == 0);
-
     // encode encrypted shared secret and ciphertext+mac combo into 
     // a single ASN1 DER stream
     {
@@ -258,12 +241,31 @@ int main(int argc, char **argv) {
         //printf("-----------------\n");
 
         // key exchange via CHK-encoded element
-        result = asn1_write_value(message_asn1, "kex", der, sz);
+        result = asn1_write_value(message_asn1, "ad.enckey", der, sz);
+        assert(result == 0);
+
+        // key exchange via CHK-encoded element
+        result = asn1_write_value(message_asn1, "ad.nonce", nonce, sizeof(nonce));
         assert(result == 0);
 
         // interval for encryption
         sprintf(interval_string,"%d", interval);
-        result = asn1_write_value(message_asn1, "interval", interval_string, 0);
+        result = asn1_write_value(message_asn1, "ad.interval", interval_string, 0);
+        assert(result == 0);
+
+        // dump additional data in DER format
+        free(der);
+        sz += clen + 256;
+        bufsz = sz;
+        der = (char *)malloc((sz) * sizeof(char));
+        result = asn1_der_coding(message_asn1, "ad", der, &sz, asnError);
+        assert(result == 0);
+        assert(sz < bufsz);
+
+        // AEAD symmetric encryption with shared key, MAC covers both message and
+        // additional data (encrypted shared key (in der), nonce, interval).
+        result = crypto_aead_chacha20poly1305_encrypt(ctext, &clen, msg,
+            msglen, (unsigned char *)der, sz, NULL, nonce, shared_hash);
         assert(result == 0);
 
         // ciphertext of input message
@@ -274,13 +276,14 @@ int main(int argc, char **argv) {
         //asn1_print_structure(stdout, message_asn1, "", ASN1_PRINT_ALL);
         //printf("-----------------\n");
 
-        free(der);
-        sz += clen + 256;
-        clen = sz;
-        der = (char *)malloc((sz) * sizeof(char));
+        // encode the entire message
+        sz = bufsz;
         result = asn1_der_coding(message_asn1, "", der, &sz, asnError);
         assert(result == 0);
-        assert(sz < clen);
+        assert(sz < bufsz);
+
+        asn1_delete_structure(&message_asn1);
+        asn1_delete_structure(&example_asn1);
     }
 
     result = write_b64wrapped_to_file(stdout, der, sz, "CHK MESSAGE");
