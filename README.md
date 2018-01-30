@@ -19,7 +19,7 @@ This implementation relies on the excellent work of several others:
 * Ben Lynn's Pairing Based Cryptography library: <https://crypto.stanford.edu/pbc/>
 * Thomas Icart, Eric Brier and friends work in uniform hashing into elliptic curve groups <https://eprint.iacr.org/2009/340.pdf>
 
-There are <examples> provided which are intended to illustrate how the library
+There are [examples](examples) provided which are intended to illustrate how the library
 can be used to generate keypairs, update private keys and then use these keys
 to encode and decode messages.
 
