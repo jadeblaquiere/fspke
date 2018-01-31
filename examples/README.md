@@ -63,8 +63,8 @@ Up to this point, any Public Key Encryption (PKE) scheme could have enabled
 Alice and Bob to agree on a key such that Alice could encrypt a message
 that only Bob could (practically) decrypt. What makes this particular scheme
 unique is that Bob can update his private key such that he (or any attacker
-who was able to obtain his key by any means, e.g. <https://xkdc>) can decode
-future messages but can no longer decrypt messages from the past.
+who was able to obtain his key by any means, e.g. <https://xkcd.com/538/>) can
+decode future messages but can no longer decrypt messages from the past.
 
 1. Derive a private key for an interval (in the future)
 
