@@ -31,7 +31,7 @@
 #include <assert.h>
 #include <chkpke.h>
 #include <ecurve.h>
-#include <endian.h>
+#include <portable_endian.h>
 #include <icarthash.h>
 #include <libtasn1.h>
 #include <sparsetree.h>

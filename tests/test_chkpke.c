@@ -444,8 +444,8 @@ static Suite *CHKPKE_test_suite(void) {
     tcase_add_test(tc, test_chkpke_export_privkey_der);
     tcase_add_test(tc, test_chkpke_encode_message);
 
-    // set 10 second timeout instead of default 4
-    tcase_set_timeout(tc, 10.0);
+    // set 20 second timeout instead of default 4
+    tcase_set_timeout(tc, 20.0);
 
     suite_add_tcase(s, tc);
     return s;

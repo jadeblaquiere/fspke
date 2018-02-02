@@ -148,6 +148,9 @@ static Suite *sparseTree_test_suite(void) {
     s = suite_create("Sparse Tree implementation");
     tc = tcase_create("allocation and traversal");
 
+    // set 10 second timeout instead of default 4
+    tcase_set_timeout(tc, 10.0);
+
     tcase_add_test(tc, test_sparsetree_walk);
     tcase_add_test(tc, test_sparsetree_random);
     suite_add_tcase(s, tc);

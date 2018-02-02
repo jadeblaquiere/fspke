@@ -32,7 +32,7 @@
 #include <b64file.h>
 #include <check.h>
 #include <chkpke.h>
-#include <endian.h>
+#include <portable_endian.h>
 #include <libtasn1.h>
 #include <limits.h>
 #include <popt.h>
