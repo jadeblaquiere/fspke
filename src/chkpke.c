@@ -566,9 +566,11 @@ static int _CHKPKE_der_for_node(CHKPKE_t chk, int depth, int64_t ordinal) {
     _chkpke_node_data_t *nd;
     _chkpke_node_data_t *pnd;
 
+    //printf("seeking key for %d, %ld\n", depth, ordinal);
     node = sparseTree_find_by_address(chk->tree, depth, ordinal);
     nd = (_chkpke_node_data_t *)node->nodeData;
 
+    //printf("found\n");
     if (nd->S != NULL) {
         assert (nd->nR == depth);
         return 0;
@@ -646,59 +648,210 @@ typedef struct __chkpke_node_config_t {
 // keeping in mind that keys are hierarchical, so parent can encode all
 // children (so if you don't want ALL the children then you need to
 // encode the children you want and not the parent)
-static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, int depth, int64_t interval) {
-    _chkpke_node_config_t *head;
-    _chkpke_node_config_t *next;
+static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, int depth, int64_t start, int64_t end) {
+    _chkpke_node_config_t *head = (_chkpke_node_config_t *)NULL;
+    _chkpke_node_config_t *next = (_chkpke_node_config_t *)NULL;
+    _chkpke_node_config_t *nconfig = (_chkpke_node_config_t *)NULL;
     sparseTree_ptr_t node;
     int64_t i;
-    int64_t stop;
-    //printf("keylist head @ (%d, %ld)\n", depth, interval);
-    if (_CHKPKE_der_for_node(chk, depth, interval) != 0) {
+    int64_t upstart, upend, startstop, beginend;
+    //printf("keylist head @ (%d, %ld, %ld)\n", depth, start, end);
+
+    if (depth == 0) {
+        assert(start == 0);
+        assert(end == 0);
+    }
+
+    if (end < start) return (_chkpke_node_config_t *)NULL;
+
+    // validate that keys exist for start, end - all keys between implied
+    if ((_CHKPKE_der_for_node(chk, depth, start) != 0) ||
+        (_CHKPKE_der_for_node(chk, depth, end) != 0)) {
+        //printf("keylist head @ (%d, %ld, %ld)\n", depth, start, end);
+        //printf("unable to generate keys\n");
         return (_chkpke_node_config_t *)NULL;
     }
 
+    if ((start % chk->order) == 0) {
+        // start on block boundary
+        if ((end - start) >= chk->order) {
+            // contains all of btree leaves of first "block"
+            upstart = start / chk->order;
+            upend = end / chk->order;
+            startstop = start - 1;
+            if ((end % chk->order) == (chk->order - 1)) {
+                // start and end on boundary
+                beginend = end + 1;
+            } else {
+                // start on boundary and end not
+                beginend = end - (end % chk->order);
+                upend -= 1;
+            }
+        } else if ((end - start) == (chk->order - 1)) {
+            // exactly one block on boundary
+            upstart = start / chk->order;
+            upend = upstart;
+            startstop = start - 1;
+            beginend = end + 1;
+        } else {
+            // less than a single block
+            upstart = 0;
+            upend = -1;
+            startstop = end;
+            beginend = end + 1;
+        }
+    } else {
+        // start not on boundary
+        if ((end / chk->order) <= ((start / chk->order) + 1)) {
+            // both in the same block or in consecutive
+            upstart = 0;
+            upend = -1;
+            startstop = end;
+            beginend = end + 1;
+        } else {
+            // at least one complete block in the middle
+            upstart = start / chk->order + 1;
+            upend = end / chk->order;
+            startstop = (upstart * chk->order) - 1 ;
+            if ((end % chk->order) == (chk->order - 1)) {
+                // end on block boundary
+                beginend = end + 1;
+            } else {
+                // end not on boundary
+                beginend = upend * chk->order;
+                upend -= 1;
+            }
+        }
+    }
+
     // encode node + right from current level
-    head = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
-    next = head;
-    stop = interval + (chk->order - (interval % chk->order));
-    for (i = interval; i < stop; i++) {
+    //upstart = start + ((chk->order - (start % chk->order)) % chk->order) ;
+    //upend  = (end + 1) - ((end + 1) % chk->order) ;
+
+    //printf("upstart, upend = %ld, %ld\n", upstart, upend);
+    //printf("startstop, beginend = %ld, %ld\n", startstop, beginend);
+
+    //printf("building keylist\n");
+
+    for (i = start; i <= startstop; i++) {
+        nconfig = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
+        if (head == NULL) {
+            head = nconfig;
+            next = head;
+        } else {
+            assert(next != NULL);
+            next->next = nconfig;
+            next = nconfig;
+        }
+        nconfig->next = (_chkpke_node_config_t *)NULL;
         //printf("node @ (%d, %ld)\n", depth, i);
         // must call _der_for_node to populate R,S in nodeData
         assert(_CHKPKE_der_for_node(chk, depth, i) == 0);
         node = sparseTree_find_by_address(chk->tree, depth, i);
-        next->nd = (_chkpke_node_data_t *)node->nodeData;
-        next->depth = depth;
-        next->ordinal = i;
-        if ((i + 1) < stop) {
-            next->next = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
-            next = next->next;
-            next->next = (_chkpke_node_config_t *)NULL;
+        nconfig->nd = (_chkpke_node_data_t *)node->nodeData;
+        nconfig->depth = depth;
+        nconfig->ordinal = i;
+    }
+
+    for (i = beginend; i <= end; i++) {
+        nconfig = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
+        if (head == NULL) {
+            head = nconfig;
+            next = head;
+        } else {
+            assert(next != NULL);
+            next->next = nconfig;
+            next = nconfig;
         }
+        nconfig->next = (_chkpke_node_config_t *)NULL;
+        //printf("node @ (%d, %ld)\n", depth, i);
+        // must call _der_for_node to populate R,S in nodeData
+        assert(_CHKPKE_der_for_node(chk, depth, i) == 0);
+        node = sparseTree_find_by_address(chk->tree, depth, i);
+        nconfig->nd = (_chkpke_node_data_t *)node->nodeData;
+        nconfig->depth = depth;
+        nconfig->ordinal = i;
     }
 
     // encode parent + 1 from next level up (and recurse)
-    {
-        int dnext = depth - 1;
-        int onext = (interval / chk->order) + 1;
-
-        // skip encoding level if can encode level - 1
-        while (((onext % chk->order) == 0) && (depth > 0)) {
-            dnext -= 1;
-            onext = (onext / chk->order);
+    if (upend >= upstart) {
+        nconfig = _CHKPKE_keylist_for_depth_interval(chk, depth - 1, upstart, upend);
+        if (head == NULL) {
+            head = nconfig;
+        } else {
+            assert(next != NULL);
+            next->next = nconfig;
         }
-
-        if (dnext == 0) return head;
-        next->next = _CHKPKE_keylist_for_depth_interval(chk, dnext, onext);
     }
 
     return head;
 }
 
-static _chkpke_node_config_t *_CHKPKE_keylist_for_interval(CHKPKE_t chk, int64_t interval) {
+static int64_t _expi64(int64_t a, int64_t e) {
+    assert(e >= 0);
+    assert(e < 64);
+    if (e == 0) return 1;
+    return a * _expi64(a, e - 1);
+}
+
+static void _validate_keylist(_chkpke_node_config_t *nconfig, int depth, int order, int64_t start, int64_t end) {
+    _chkpke_node_config_t *head;
+    _chkpke_node_config_t *next;
+    int64_t minkey, maxkey, k, kk, j, jj;
+
+    // find min, max key
+    head = nconfig;
+    minkey = head->ordinal * _expi64(order, (depth - head->depth));
+    maxkey = minkey + _expi64(order, depth - head->depth) - 1;
+    //printf("key @ %d, %ld spans %ld -> %ld\n", head->depth, head->ordinal, minkey, maxkey);
+    head = head->next;
+    while (head != NULL) {
+        k = head->ordinal * _expi64(order, (depth - head->depth));
+        if (k < minkey) minkey = k;
+        kk = k + _expi64(order, depth - head->depth) - 1;
+        if (kk > maxkey) maxkey = kk;
+        //printf("key @ %d, %ld spans %ld -> %ld\n", head->depth, head->ordinal, k, kk);
+        head = head->next;
+    }
+    assert(minkey == start);
+    assert(maxkey == end);
+
+    // ensure keys are contiguous and do not overlap, no duplicates
+    head = nconfig;
+    while (head != NULL) {
+        k = head->ordinal * _expi64(order, (depth - head->depth));
+        kk = k + _expi64(order, depth - head->depth) - 1;
+        j = kk;
+        next = nconfig;
+        while (j != kk + 1) {
+            if (next == NULL) {
+                //printf("unmatched key @ %d, %ld spans %ld -> %ld\n", head->depth, head->ordinal, k, kk);
+                assert(kk == end);
+                break;
+            }
+            j = next->ordinal * _expi64(order, (depth - next->depth));
+            jj = j + _expi64(order, depth - next->depth) - 1;
+            if (next != head) {
+                assert(j != k);
+                assert(jj != kk);
+                if (j > k) assert (j > kk);
+                if (k > j) assert (k > jj);
+            }
+            next = next->next;
+        }
+        head = head->next;
+    }
+
+    return;
+}
+
+static _chkpke_node_config_t *_CHKPKE_keylist_for_start_end(CHKPKE_t chk, int64_t start, int64_t end) {
     _chkpke_node_config_t *head;
     //_chkpke_node_config_t *next;
-    //int64_t i;
-    head = _CHKPKE_keylist_for_depth_interval(chk, chk->depth, interval);
+
+    head = _CHKPKE_keylist_for_depth_interval(chk, chk->depth, start, end);
+
+    if (head != NULL) _validate_keylist(head, chk->depth, chk->order, start, end);
 
     //next = head;
     //printf("-- list out start --\n");
@@ -715,6 +868,14 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_interval(CHKPKE_t chk, int64_t
     //printf("-- list out end --\n");
 
     return head;
+}
+
+static _chkpke_node_config_t *_CHKPKE_keylist_for_interval(CHKPKE_t chk, int64_t interval) {
+    int64_t e;
+
+    e = _expi64(chk->order, chk->depth) - 1;
+
+    return _CHKPKE_keylist_for_start_end(chk, interval, e);
 }
 
 static void _CHKPKE_keylist_clean(_chkpke_node_config_t *list) {
@@ -739,6 +900,7 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval) {
     //printf("Upd for interval %ld\n", interval);
     keylist = _CHKPKE_keylist_for_interval(chk, interval);
     if (keylist == NULL) return -1;
+    _CHKPKE_keylist_clean(keylist);
 
     node = sparseTree_find_by_address(chk->tree, chk->depth, interval);
     parent = node->parent;
@@ -778,7 +940,7 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval) {
     return 0;
 }
 
-char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
+char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t end, int *sz) {
     _chkpke_node_config_t *keylist;
     _chkpke_node_config_t *nextkey;
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
@@ -792,7 +954,7 @@ char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
 
     sum = 0;
 
-    keylist = _CHKPKE_keylist_for_interval(chk, interval);
+    keylist = _CHKPKE_keylist_for_start_end(chk, start, end);
     if (keylist == (_chkpke_node_config_t *)NULL) {
         return (char *)NULL;
     }
@@ -927,6 +1089,14 @@ char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
     _CHKPKE_keylist_clean(keylist);
     *sz = length;
     return buffer;
+}
+
+char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
+    int64_t e;
+
+    e = _expi64(chk->order, chk->depth) - 1;
+
+    return CHKPKE_privkey_encode_delegate_DER(chk, interval, e, sz);
 }
 
 static int _asn1_read_mpz_from_octet_string(mpz_t value, asn1_node root, char *attribute) {
@@ -1675,7 +1845,7 @@ error_cleanup1:
     return -1;
 }
 
-char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz) {
+char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -1862,7 +2032,7 @@ static int _asn1_read_element_gt_from_xy(element_t value, asn1_node root, char *
     return 0;
 }
 
-int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int interval) {
+int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int64_t interval) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];

@@ -350,8 +350,68 @@ START_TEST(test_chkpke_export_privkey_der)
     CHKPKE_clear(pke1);
 END_TEST
 
+START_TEST(test_chkpke_export_import_privkey_delegate)
+    CHKPKE_t pke1;
+    CHKPKE_t pke2;
+    int i;
+    int sz1;
+    int sz2;
+    unsigned char *der1;
+    unsigned char *der2;
+
+    //printf("generating key\n");
+    CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
+
+    //printf("exporting key\n");
+    der1 = (unsigned char *)CHKPKE_privkey_encode_delegate_DER(pke1, 1, (1<<(6*4-1)) - 2, &sz1);
+    assert(der1 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz1);
+    for (i = 0; i < sz1; i++) {
+        printf("%02X", der1[i]);
+    }
+    printf("\n");
+
+    i = CHKPKE_init_privkey_decode_DER(pke2, (char *)der1, sz1);
+    assert(i == 0);
+    assert(pke2->depth == 6);
+    assert(pke2->order == 16);
+    assert(mpz_cmp(pke1->q, pke2->q) == 0);
+    assert(mpz_cmp(pke1->r, pke2->r) == 0);
+    assert(mpz_cmp(pke1->h, pke2->h) == 0);
+    assert(element_cmp(pke1->P, pke2->P) == 0);
+    assert(element_cmp(pke1->Q, pke2->Q) == 0);
+
+    // validate that the new keyset cannot derive secrets for begin - 1, end + 1
+    // but can derive secrets for begin and end
+    assert(CHKPKE_Der(pke2,0) != 0);
+    assert(CHKPKE_Der(pke2,1) == 0);
+    assert(CHKPKE_Der(pke2,(1<<(6*4-1)) - 2) == 0);
+    assert(CHKPKE_Der(pke2,(1<<(6*4-1)) - 1) != 0);
+
+    der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, 0, &sz2);
+    assert(der2 == NULL);
+    der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, 1, &sz2);
+    assert(der2 == NULL);
+    der2 = (unsigned char *)CHKPKE_privkey_encode_delegate_DER(pke2, 0, (1<<(6*4-1)) - 2, &sz2);
+    assert(der2 == NULL);
+    der2 = (unsigned char *)CHKPKE_privkey_encode_delegate_DER(pke2, 1, (1<<(6*4-1)) - 2, &sz2);
+    assert(der2 != NULL);
+    //printf("DER encoded privkey (%d bytes)=\n", sz2);
+    assert(sz1 == sz2);
+    for (i = 0; i < sz2; i++) {
+        //printf("%02X", der2[i]);
+        assert(der1[i] == der2[i]);
+    }
+    //printf("\n");
+
+    free(der2);
+    free(der1);
+    CHKPKE_clear(pke2);
+    CHKPKE_clear(pke1);
+END_TEST
+
 START_TEST(test_chkpke_encode_message)
-    CHKPKE_t pke1, pke2;
+    CHKPKE_t pke1, pke2, pke3;
     int i, result;
     int64_t interval;
     int sz1, sz2;
@@ -398,6 +458,19 @@ START_TEST(test_chkpke_encode_message)
     free(der2);
 
     interval = randint(0, (1<<(6*4-1)));
+    der2 = (unsigned char *)CHKPKE_privkey_encode_delegate_DER(pke1, 0, interval - 1, &sz2);
+    assert(der2 != NULL);
+    printf("DER encoded privkey (%d bytes)=\n", sz2);
+    for (i = 0; i < sz2; i++) {
+        printf("%02X", der2[i]);
+    }
+    printf("\n");
+
+    i = CHKPKE_init_privkey_decode_DER(pke3, (char *)der2, sz2);
+    assert(pke3->depth != 0);
+    assert(i == 0);
+    free(der2);
+
     der2 = (unsigned char *)CHKPKE_Enc_DER(pke2, plaintext, interval, &sz2);
     assert(der2 != NULL);
     printf("DER encoded ciphertext (%d bytes)=\n", sz2);
@@ -407,6 +480,10 @@ START_TEST(test_chkpke_encode_message)
     printf("\n");
 
     element_init_GT(plaincopy, pke1->pairing);
+
+    // expect failure on delegate key (for prior intervals only)
+    result = CHKPKE_Dec_DER(plaincopy, pke3, (char *)der2, sz2, interval);
+    assert(result != 0);
 
     result = CHKPKE_Dec_DER(plaincopy, pke1, (char *)der2, sz2, interval);
     assert(result == 0);
@@ -442,6 +519,7 @@ static Suite *CHKPKE_test_suite(void) {
     tcase_add_test(tc, test_chkpke_export_import_privkey_0_der);
     tcase_add_test(tc, test_chkpke_export_import_privkey_last_der);
     tcase_add_test(tc, test_chkpke_export_privkey_der);
+    tcase_add_test(tc, test_chkpke_export_import_privkey_delegate);
     tcase_add_test(tc, test_chkpke_encode_message);
 
     // set 20 second timeout instead of default 4

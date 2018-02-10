@@ -73,9 +73,15 @@ decode future messages but can no longer decrypt messages from the past.
     Bob would have to also securely erase his previous private key)
     
     ```
-    cat bob.privkey | ./chk_der --interval=20 > bob20.privkey
+    cat bob.privkey | ./chk_der --start=20 > bob20.privkey
     cat bob20.privkey
     ```
+
+    Note that this new private is significantly larger than the original
+    private key as the original key only needed to store the secret values
+    for the root node of the tree, whereas in order to encode secret values
+    sufficient to encode all future intervals (but not previous intervals),
+    many more nodes of the tree need to have secrets encoded.
 
 1. Encode a message for the future
 
@@ -104,6 +110,35 @@ decode future messages but can no longer decrypt messages from the past.
     (ctext) are forward secure. So, presuming the older private key material is
     truly deleted, even if your private key is compromised older messages
     cannot be decrypted.
+
+## Delegate Keys
+
+Delegate keys are keys which are defined for a limited window of intervals such
+that if that key is shared between multiple devices and a delegate key is
+revealed not all future messages are compromised. Essentially a delegate key
+has a start and end interval for which it is valid (which could even be a
+single interval value).
+
+1. Derive a delegate key for a window of intervals
+
+    Bob is going to be on vacation for the next few days and wants his sister
+    Carol to be able to read messages on his behalf while he's gone. He
+    generates a key which is only valid for that period of time.
+
+    ```
+    cat bob.privkey | ./chk_der --start=5 --end=15 > bob5_15.privkey
+    cat bob5_15.privkey
+    ```
+
+1. Verify that delegate key can only decode for contained intervals
+
+    Carol can read messages only during the period of time when Bob is gone
+    on vacation. Messages encoded outside of the window covered by the delegate
+    key cannot be decoded.
+    ```
+    cat ctext10 | ./chk_dec --key=bob5_15.privkey
+    cat ctext30 | ./chk_dec --key=bob5_15.privkey
+    ```
 
 For more information on the algorithm and associated security proof, please
 refer to ["A Forward-Secure Public Key Encryption Scheme"; Ran Canetti, Shai Halevi and Jonathan Katz](https://eprint.iacr.org/2003/083.pdf)

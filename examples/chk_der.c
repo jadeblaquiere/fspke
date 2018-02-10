@@ -37,14 +37,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static int64_t _expi64(int64_t a, int64_t e) {
+    assert(e >= 0);
+    assert(e < 64);
+    if (e == 0) return 1;
+    return a * _expi64(a, e - 1);
+}
+
 int main(int argc, char **argv) {
     char *filename = NULL;
-    int interval = 0;
+    int start = 0;
+    int end = -1;
     FILE *fPtr = stdin;
     poptContext pc;
     struct poptOption po[] = {
         {"file", 'f', POPT_ARG_STRING, &filename, 0, "read input from filepath instead of stdin", "file path"},
-        {"interval", 'i', POPT_ARG_INT, &interval, 0, "set interval for output key, default = 0", "interval"},
+        {"start", 'i', POPT_ARG_INT, &start, 0, "set start of interval for output key, default = 0", "start"},
+        {"end", 'i', POPT_ARG_INT, &end, -1, "set end interval for output key, default = <last>", "end"},
         POPT_AUTOHELP
         {NULL}
     };
@@ -92,9 +101,17 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    // handle default end case
+    if (end < 0) {
+        int64_t end64;
+        end64 = _expi64(pke->order, pke->depth) - 1;
+        assert(end64 < INT_MAX);
+        end = (int)end64;
+    }
+
     // export pubkey
     free(der);
-    der = CHKPKE_privkey_encode_DER(pke, interval, &sz);
+    der = CHKPKE_privkey_encode_delegate_DER(pke, start, end, &sz);
     if (der == NULL) {
         fprintf(stderr, "<ValueError>: Unable to derive key for interval\n");
         exit(1);

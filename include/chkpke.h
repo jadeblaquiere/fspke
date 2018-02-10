@@ -105,6 +105,10 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order);
 char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz);
 char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz);
 
+// A delegate key is limited to a specific set of intervals (i.e. it has an end
+// interval which may be less than the full life of the original key)
+char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t end, int *sz);
+
 // decode routines return non-zero on decode error
 int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz);
 int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz);
@@ -114,10 +118,11 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz);
 // interval when the key has been pruned).
 int CHKPKE_Der(CHKPKE_t chk, int64_t interval);
 
-// Upd updates to a specific interval, removing all secret information which
-// could be used to decrypt messages from a previous interval. Returns 0 on
-// success and nonzero on error (e.g. when attempting to derive secrets for
-// a past interval for which no base secret exists)
+// Upd updates a key to only contain secrets for a specific interval and beyond,
+// removing all secret information which could be used to decrypt messages from
+// previous intervals. Returns 0 on success and nonzero on error (e.g. when
+// attempting to derive secrets for a past interval for which no base secret
+// exists)
 int CHKPKE_Upd(CHKPKE_t chk, int64_t interval);
 
 // Enc_DER uses the public key attributes to encode a plaintext message into a
@@ -128,13 +133,14 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval);
 // memory once no longer in use. The message is encoded for a particular
 // interval. Once a private key is updated to a future interval the resulting
 // message cannot be decrypted.
-char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int interval, int *sz);
+char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz);
 
 // Dec_DER decodes an ASN1 DER encoded ciphertext into the original plaintext
 // element based on the private key material and the specific interval. Dec
 // returns 0 on success and -1 on error, e.g. if the key cannot be derived for
 // the specified interval.
-int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int interval);
+int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz,
+        int64_t interval);
 
 #ifdef __cplusplus
 }
