@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
         asn1_delete_structure(&example_asn1);
     }
 
-    element_init_GT(shared_element, pke->pairing);
+    CHKPKE_init_element(shared_element, pke);
     result =  CHKPKE_Dec_DER(shared_element, pke, (char *)kex_bytes, kex_sz, interval);
     if (result != 0) {
         fprintf(stderr, "<Error>: Error deriving shared key for interval\n");
@@ -237,12 +237,9 @@ int main(int argc, char **argv) {
 
     // hash shared key to get a 256-bit key for encryption w/XChaCha
     {
-        int len;
+        int len = 0;
         unsigned char *e_bytes;
-        len = element_length_in_bytes(shared_element);
-        e_bytes = (unsigned char *)malloc(len * sizeof(char));
-        assert(e_bytes != NULL);
-        element_to_bytes(e_bytes, shared_element);
+        e_bytes = CHKPKE_element_to_bytes(shared_element, &len);
 
         crypto_hash_sha256(shared_hash, e_bytes, len);
         free (e_bytes);
@@ -269,6 +266,8 @@ int main(int argc, char **argv) {
     plain_bytes[plain_sz] = 0;
 
     printf("%s", plain_bytes);
+
+    CHKPKE_element_clear(shared_element);
 
     free(plain_bytes);
     free(nonce_bytes);

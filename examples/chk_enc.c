@@ -180,20 +180,16 @@ int main(int argc, char **argv) {
     }
 
     // generate a shared (random) key;
-    element_init_GT(shared_element, pke->pairing);
-    element_random(shared_element);
+    CHKPKE_init_random_element(shared_element, pke);
 
     // encrypt shared (random) key for recipient, interval
     der = CHKPKE_Enc_DER(pke, shared_element, interval, &sz);
 
-    // hash shared key to get a 256-bit key for encryption w/XChaCha
+    // hash shared key to get a 256-bit key for encryption w/ChaCha
     {
-        int len;
+        int len = 0;
         unsigned char *e_bytes;
-        len = element_length_in_bytes(shared_element);
-        e_bytes = (unsigned char *)malloc(len * sizeof(char));
-        assert(e_bytes != NULL);
-        element_to_bytes(e_bytes, shared_element);
+        e_bytes = CHKPKE_element_to_bytes(shared_element, &len);
 
         crypto_hash_sha256(shared_hash, e_bytes, len);
         free (e_bytes);

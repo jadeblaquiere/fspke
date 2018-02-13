@@ -506,6 +506,37 @@ START_TEST(test_chkpke_encode_message)
     CHKPKE_clear(pke1);
 END_TEST
 
+START_TEST(test_chkpke_element_convenience)
+    CHKPKE_t pke;
+    element_t e1, e2;
+    unsigned char *b;
+    int len;
+    int i, j;
+
+    CHKPKE_init_Gen(pke, 256, 200, 6, 16);
+
+    for (i = 0; i < 50; i++) {
+        CHKPKE_init_random_element(e1, pke);
+        CHKPKE_element_clear(e1);
+        CHKPKE_init_random_element(e1, pke);
+        b = CHKPKE_element_to_bytes(e1, &len);
+        assert(b != NULL);
+        assert(len > 0);
+        printf("e %2d:", i);
+        for (j = 0; j < len; j++) {
+            printf("%02X", b[j]);
+        }
+        printf("\n");
+        CHKPKE_init_element_from_bytes(e2, pke, b, len);
+        assert(element_cmp(e1, e2) == 0);
+        CHKPKE_element_clear(e2);
+        CHKPKE_element_clear(e1);
+        free(b);
+    }
+
+    CHKPKE_clear(pke);
+END_TEST
+
 static Suite *CHKPKE_test_suite(void) {
     Suite *s;
     TCase *tc;
@@ -514,6 +545,7 @@ static Suite *CHKPKE_test_suite(void) {
     tc = tcase_create("allocation and traversal");
 
     tcase_add_test(tc, test_chkpke_init);
+    tcase_add_test(tc, test_chkpke_element_convenience);
     tcase_add_test(tc, test_chkpke_der);
     tcase_add_test(tc, test_chkpke_export_pubkey_der);
     tcase_add_test(tc, test_chkpke_export_import_privkey_0_der);

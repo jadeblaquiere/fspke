@@ -2158,3 +2158,43 @@ error_cleanup1:
     mpECP_clear(ecp_pt);
     return -1;
 }
+
+unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz) {
+    int len;
+    unsigned char *e_bytes;
+    len = element_length_in_bytes(e);
+    e_bytes = (unsigned char *)malloc(len * sizeof(unsigned char));
+    assert(e_bytes != NULL);
+    element_to_bytes(e_bytes, e);
+
+    *sz = len;
+    return e_bytes;
+}
+
+void CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz) {
+    int len;
+    len = element_length_in_bytes(chk->ePQ);
+    assert(sz == len);
+    element_init_GT(e, chk->pairing);
+    len = element_from_bytes(e, bytes);
+    assert(sz == len);
+
+    return;
+}
+
+void CHKPKE_init_element(element_t e, CHKPKE_t chk) {
+    element_init_GT(e, chk->pairing);
+
+    return;
+}
+
+void CHKPKE_init_random_element(element_t e, CHKPKE_t chk) {
+    element_init_GT(e, chk->pairing);
+    element_random(e);
+
+    return;
+}
+
+void CHKPKE_element_clear(element_t e) {
+    element_clear(e);
+}

@@ -142,6 +142,19 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz);
 int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz,
         int64_t interval);
 
+// convenience wrappers for handling Fp2 elements, so you don't have to
+// interact directly with pbc library if you don't want to. You can simply
+// create a random element, convert it to bytes (and hash, please) to use
+// as a key for symmetric encryption, and then if you need to you can convert
+// the bytes back into the element. NOTE: init_element_from_bytes presumes
+// it is being passed an unitialized element. If the element was previously
+// initialized it should be cleared with CHKPKE_element_clear first
+unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz);
+void CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz);
+void CHKPKE_init_element(element_t e, CHKPKE_t chk);
+void CHKPKE_init_random_element(element_t e, CHKPKE_t chk);
+void CHKPKE_element_clear(element_t e);
+
 #ifdef __cplusplus
 }
 #endif
