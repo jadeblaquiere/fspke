@@ -949,10 +949,15 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     int result;
     int length;
     int sum;
+    int64_t limit;
     //size_t lwrote;
     char *buffer;
 
     sum = 0;
+
+    // input validation
+    limit = _expi64(chk->order, chk->depth);
+    if ((start < 0) || (start > end) || (end > limit)) return (char *)NULL;
 
     keylist = _CHKPKE_keylist_for_start_end(chk, start, end);
     if (keylist == (_chkpke_node_config_t *)NULL) {
