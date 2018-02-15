@@ -32,7 +32,6 @@
 #define _FSPKE_H_INCLUDED_
 
 #include <chkpke.h>
-#include <fspke.h>
 #include <gmp.h>
 #include <Python.h>
 
