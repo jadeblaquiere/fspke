@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
 
     // read entire b64 coded message (kex+interval+ciphertext-w/mac) into mem
     
-    der = read_b64wrapped_from_file(fPtr, "CHK MESSAGE", &sz);
+    der = read_b64wrapped_from_file(fPtr, "CHK ENCRYPTED MESSAGE", &sz);
     if (der == NULL) {
         fprintf(stderr,"<Error>: Unable to extract b64 message from input\n");
         exit(1);
@@ -268,7 +268,6 @@ int main(int argc, char **argv) {
     printf("%s", plain_bytes);
 
     CHKPKE_element_clear(shared_element);
-
     free(plain_bytes);
     free(nonce_bytes);
     free(kex_bytes);

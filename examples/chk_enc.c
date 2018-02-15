@@ -282,7 +282,7 @@ int main(int argc, char **argv) {
         asn1_delete_structure(&example_asn1);
     }
 
-    result = write_b64wrapped_to_file(stdout, der, sz, "CHK MESSAGE");
+    result = write_b64wrapped_to_file(stdout, der, sz, "CHK ENCRYPTED MESSAGE");
     if (result != 0) {
         fprintf(stderr, "<WriteError>: Error writing output\n");
         exit(1);

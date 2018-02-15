@@ -1,7 +1,8 @@
 # fspke examples
 
 These examples are intended to illustrate usage of the forward secure PKE
-implementation
+implementation. They exercise the major features of the C API, and there are
+also [interoperable equivalents using the python API](../python/examples/).
 
 # Tutorial
 

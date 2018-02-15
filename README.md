@@ -1,7 +1,7 @@
 # fspke
 
 C library implementing forward-secure public key cryptosystem as described
-by Canetti, Halevi and Katz (CHK) in 2003 <https://eprint.iacr.org/2003/083.pdf>. 
+by Canetti, Halevi and Katz (CHK) in 2003 <https://eprint.iacr.org/2003/083.pdf>.
 
 Forward secrecy (or forward security) in a cryptosystem implies that if at
 some point in time somebody's secret key is obtained that past messages
@@ -41,3 +41,21 @@ make clean
 make
 sudo make install
 ```
+
+# Installing Python bindings
+
+Once the C library itself is installed, the python3 bindings module can be built
+and installed via the setup.py or pip using something *like* either of these:
+
+1. Via setup.py directly
+
+    ```
+    python3 ./setup.py build
+    sudo python3 ./setup.py install
+    ```
+
+1. Via pip
+
+    ```
+    sudo pip3 install .
+    ```
