@@ -512,6 +512,7 @@ START_TEST(test_chkpke_element_convenience)
     unsigned char *b;
     int len;
     int i, j;
+    int status;
 
     CHKPKE_init_Gen(pke, 256, 200, 6, 16);
 
@@ -527,7 +528,8 @@ START_TEST(test_chkpke_element_convenience)
             printf("%02X", b[j]);
         }
         printf("\n");
-        CHKPKE_init_element_from_bytes(e2, pke, b, len);
+        status = CHKPKE_init_element_from_bytes(e2, pke, b, len);
+        assert(status == 0);
         assert(element_cmp(e1, e2) == 0);
         CHKPKE_element_clear(e2);
         CHKPKE_element_clear(e1);

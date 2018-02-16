@@ -2176,15 +2176,18 @@ unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz) {
     return e_bytes;
 }
 
-void CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz) {
+int CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz) {
     int len;
     len = element_length_in_bytes(chk->ePQ);
-    assert(sz == len);
+    if (sz != len) return -1;
     element_init_GT(e, chk->pairing);
     len = element_from_bytes(e, bytes);
-    assert(sz == len);
+    if (sz != len) {
+        element_clear(e);
+        return -1;
+    }
 
-    return;
+    return 0;
 }
 
 void CHKPKE_init_element(element_t e, CHKPKE_t chk) {

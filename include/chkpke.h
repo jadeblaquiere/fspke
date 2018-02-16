@@ -148,9 +148,9 @@ int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz,
 // as a key for symmetric encryption, and then if you need to you can convert
 // the bytes back into the element. NOTE: init_element_from_bytes presumes
 // it is being passed an unitialized element. If the element was previously
-// initialized it should be cleared with CHKPKE_element_clear first
+// initialized it should be cleared with CHKPKE_element_clear first. 
 unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz);
-void CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz);
+int CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz);
 void CHKPKE_init_element(element_t e, CHKPKE_t chk);
 void CHKPKE_init_random_element(element_t e, CHKPKE_t chk);
 void CHKPKE_element_clear(element_t e);
