@@ -70,6 +70,7 @@ typedef struct {
     bool is_secret;
     int depth;
     int order;
+    int64_t maxinterval;
     pbc_param_t param;
     pairing_t pairing;
     element_t P;

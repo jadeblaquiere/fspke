@@ -41,6 +41,13 @@
 #include <string.h>
 #include <strings.h>
 
+static int64_t _expi64(int64_t a, int64_t e) {
+    assert(e >= 0);
+    assert(e < 64);
+    if (e == 0) return 1;
+    return a * _expi64(a, e - 1);
+}
+
 typedef struct {
     element_ptr S;
     element_ptr R;
@@ -258,6 +265,7 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     assert(order>0);
     chk->depth = depth;
     chk->order = order;
+    chk->maxinterval = _expi64(order, depth) - 1;
     //printf("generating pairing\n");
     // generate random pairing (fields, etc)
     pbc_param_init_a_gen(chk->param, rbits, qbits);
@@ -633,6 +641,8 @@ static int _CHKPKE_der_for_node(CHKPKE_t chk, int depth, int64_t ordinal) {
 }
 
 int CHKPKE_Der(CHKPKE_t chk, int64_t interval) {
+    if ((interval < 0) || (interval > chk->maxinterval)) return -1;
+
     return _CHKPKE_der_for_node(chk, chk->depth, interval);
 }
 
@@ -787,13 +797,6 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
     return head;
 }
 
-static int64_t _expi64(int64_t a, int64_t e) {
-    assert(e >= 0);
-    assert(e < 64);
-    if (e == 0) return 1;
-    return a * _expi64(a, e - 1);
-}
-
 static void _validate_keylist(_chkpke_node_config_t *nconfig, int depth, int order, int64_t start, int64_t end) {
     _chkpke_node_config_t *head;
     _chkpke_node_config_t *next;
@@ -849,6 +852,9 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_start_end(CHKPKE_t chk, int64_
     _chkpke_node_config_t *head;
     //_chkpke_node_config_t *next;
 
+    // basic bounds checking
+    if ((start < 0) || (start > end) || (end > chk->maxinterval)) return NULL;
+
     head = _CHKPKE_keylist_for_depth_interval(chk, chk->depth, start, end);
 
     if (head != NULL) _validate_keylist(head, chk->depth, chk->order, start, end);
@@ -873,8 +879,9 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_start_end(CHKPKE_t chk, int64_
 static _chkpke_node_config_t *_CHKPKE_keylist_for_interval(CHKPKE_t chk, int64_t interval) {
     int64_t e;
 
-    e = _expi64(chk->order, chk->depth) - 1;
+    e = chk->maxinterval;
 
+    // defer bounds checking to _CHKPKE_keylist_for_start_end
     return _CHKPKE_keylist_for_start_end(chk, interval, e);
 }
 
@@ -895,6 +902,8 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval) {
     _chkpke_node_config_t *keylist;
     sparseTree_ptr_t node, parent, sibling;
     int i;
+
+    // defer bounds checking to _CHKPKE_keylist_for_interval
 
     // ensure all secrets derived for interval
     //printf("Upd for interval %ld\n", interval);
@@ -949,15 +958,13 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     int result;
     int length;
     int sum;
-    int64_t limit;
     //size_t lwrote;
     char *buffer;
 
     sum = 0;
 
     // input validation
-    limit = _expi64(chk->order, chk->depth);
-    if ((start < 0) || (start > end) || (end > limit)) return (char *)NULL;
+    if ((start < 0) || (start > end) || (end > chk->maxinterval)) return NULL;
 
     keylist = _CHKPKE_keylist_for_start_end(chk, start, end);
     if (keylist == (_chkpke_node_config_t *)NULL) {
@@ -1468,6 +1475,8 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     if (result != 0) goto error_cleanup2;
     //gmp_printf("order parsed as : %d (0x%x)\n", chk->order, chk->order);
 
+    chk->maxinterval = _expi64(chk->order, chk->depth) - 1;
+
     {
         mpz_t x,y;
 
@@ -1679,6 +1688,8 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     if (result != 0) goto error_cleanup2;
     //gmp_printf("order parsed as : %d (0x%x)\n", chk->order, chk->order);
 
+    chk->maxinterval = _expi64(chk->order, chk->depth) - 1;
+
     {
         mpz_t x,y;
 
@@ -1871,6 +1882,8 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
 
     sum = 0;
 
+    if ((interval < 0) || (interval > chk->maxinterval)) return NULL;
+
     result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
 
     if (result != 0) {
@@ -1945,6 +1958,7 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
     sum += 256;  // pad for DER header + some extra just in case
     length = sum;
     buffer = (char *)malloc((sum) * sizeof(char));
+    assert(buffer != NULL);
     result = asn1_der_coding(ciphertext_asn1, "", buffer, &length, asnError);
     assert(result == 0);
     assert(length < sum);
@@ -2051,6 +2065,7 @@ int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int64_t 
     element_t e_pt, e_gt, eU0Sw, pi;
 
     // ensure we can derive the secrets for the chosen interval
+    // note: bounds checking of interval is covered in CHKPKE_Der
     result = CHKPKE_Der(chk, interval);
     if (result != 0) return -1;
 

@@ -127,6 +127,10 @@ START_TEST(test_chkpke_der)
         CHKPKE_Der(pke, randint(0, (1<<(6*4-1))));
         //printf("found\n");
     }
+    assert(CHKPKE_Der(pke,0) == 0);
+    assert(CHKPKE_Der(pke,(1<<(6*4))-1) == 0);
+    assert(CHKPKE_Der(pke,-1) != 0);
+    assert(CHKPKE_Der(pke,1<<(6*4)) != 0);
 
     CHKPKE_clear(pke);
 END_TEST
@@ -182,6 +186,10 @@ START_TEST(test_chkpke_export_import_privkey_0_der)
     CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
 
     //printf("exporting key\n");
+    der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, -1, &sz1);
+    assert(der1 == NULL);
+
+    //printf("exporting key\n");
     der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, 0, &sz1);
     assert(der1 != NULL);
     printf("DER encoded privkey (%d bytes)=\n", sz1);
@@ -220,8 +228,11 @@ START_TEST(test_chkpke_export_import_privkey_last_der)
     //printf("generating key\n");
     CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
 
+    der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, (1<<(6*4)), &sz1);
+    assert(der1 == NULL);
+
     //printf("exporting key\n");
-    der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, (1<<(6*4-1)) - 1, &sz1);
+    der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, (1<<(6*4)) - 1, &sz1);
     assert(der1 != NULL);
     printf("DER encoded privkey (%d bytes)=\n", sz1);
     for (i = 0; i < sz1; i++) {
@@ -231,7 +242,7 @@ START_TEST(test_chkpke_export_import_privkey_last_der)
 
     i = CHKPKE_init_privkey_decode_DER(pke2, (char *)der1, sz1);
     assert(i == 0);
-    der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, (1<<(6*4-1)) - 1, &sz2);
+    der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, (1<<(6*4)) - 1, &sz2);
     assert(der2 != NULL);
     //printf("DER encoded privkey (%d bytes)=\n", sz2);
     assert(sz1 == sz2);
