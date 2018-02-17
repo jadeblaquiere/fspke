@@ -185,17 +185,14 @@ func (z *CHKPKE) GenerateRandomElement() (e *Element) {
 	return e
 }
 
-func (e *Element) ToBytes() (b []byte, err error) {
+func (e *Element) ToBytes() (b []byte) {
 	var c_b *C.uchar
 	l := C.int(0)
 
 	c_b = C.CHKPKE_element_to_bytes(e.ele, &l)
-	if c_b == nil {
-		return nil, errors.New("Element.ToBytes: Unable to export value")
-	}
 
 	defer C.free(unsafe.Pointer(c_b))
-	return C.GoBytes(unsafe.Pointer(c_b), l), nil
+	return C.GoBytes(unsafe.Pointer(c_b), l)
 }
 
 func (z *CHKPKE) Encrypt(e *Element, interval int64) (ct []byte, err error) {

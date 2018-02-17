@@ -163,8 +163,7 @@ func TestCHKPKEEncryptDecrypt(t *testing.T) {
 	}
 	e := pub.GenerateRandomElement()
 
-	eb, _ := e.ToBytes()
-	fmt.Println("Plaintext (in)  = ", hex.EncodeToString(eb))
+	fmt.Println("Plaintext (in)  = ", hex.EncodeToString(e.ToBytes()))
 	ct, err := pub.Encrypt(e, 10)
 	if err != nil {
 		fmt.Println("Error encrypting element")
@@ -175,9 +174,8 @@ func TestCHKPKEEncryptDecrypt(t *testing.T) {
 		fmt.Println("Error decrypting element")
 		t.FailNow()
 	}
-	ptb, _ := pt.ToBytes()
-	fmt.Println("Plaintext (out) = ", hex.EncodeToString(ptb))
-	if bytes.Compare(eb, ptb) != 0 {
+	fmt.Println("Plaintext (out) = ", hex.EncodeToString(pt.ToBytes()))
+	if bytes.Compare(e.ToBytes(), pt.ToBytes()) != 0 {
 		fmt.Println("mismatch initial plaintext != decrypted plaintext")
 		t.FailNow()
 	}
@@ -188,8 +186,7 @@ func TestCHKPKEEncryptDecrypt(t *testing.T) {
 				fmt.Println("Error decrypting element")
 				t.FailNow()
 			}
-			ptb, _ := pt.ToBytes()
-			if bytes.Compare(eb, ptb) == 0 {
+			if bytes.Compare(e.ToBytes(), pt.ToBytes()) == 0 {
 				fmt.Println("Error: collision decrypting with wrong interval")
 				t.FailNow()
 			}
