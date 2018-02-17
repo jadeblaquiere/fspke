@@ -43,6 +43,28 @@ func TestCHKPKEGen(t *testing.T) {
 		fmt.Println("Error: nil returned from Gen")
 		t.FailNow()
 	}
+	if pke.Maxinterval() != ((1 << (6 * 4)) - 1) {
+		fmt.Println("Error: Maxinterval mismatch")
+		t.FailNow()
+	}
+	pke = CHKPKEGen(256, 192, 4, 8)
+	if pke == nil {
+		fmt.Println("Error: nil returned from Gen")
+		t.FailNow()
+	}
+	if pke.Maxinterval() != ((1 << (4 * 3)) - 1) {
+		fmt.Println("Error: Maxinterval mismatch")
+		t.FailNow()
+	}
+	pke = CHKPKEGen(128, 96, 8, 4)
+	if pke == nil {
+		fmt.Println("Error: nil returned from Gen")
+		t.FailNow()
+	}
+	if pke.Maxinterval() != ((1 << (8 * 2)) - 1) {
+		fmt.Println("Error: Maxinterval mismatch")
+		t.FailNow()
+	}
 }
 
 func TestCHKPKEExportPubkey(t *testing.T) {

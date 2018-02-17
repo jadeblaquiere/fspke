@@ -230,3 +230,7 @@ func (z *CHKPKE) Decrypt(ct []byte, interval int64) (e *Element, err error) {
 	}
 	return e, nil
 }
+
+func (z *CHKPKE) Maxinterval() int64 {
+	return int64(z.pke.maxinterval)
+}
