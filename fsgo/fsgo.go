@@ -177,12 +177,12 @@ func element_clear(e *Element) {
 	C.free_Element(e.ele)
 }
 
-func (z *CHKPKE) GenerateRandomElement() (e *Element, err error) {
+func (z *CHKPKE) GenerateRandomElement() (e *Element) {
 	e = new(Element)
 	e.ele = C.malloc_Element()
 	C.CHKPKE_init_random_element(e.ele, z.pke)
 	runtime.SetFinalizer(e, element_clear)
-	return e, nil
+	return e
 }
 
 func (e *Element) ToBytes() (b []byte, err error) {

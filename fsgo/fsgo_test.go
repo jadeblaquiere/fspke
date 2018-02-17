@@ -161,11 +161,8 @@ func TestCHKPKEEncryptDecrypt(t *testing.T) {
 		fmt.Println("Error importing Pubkey")
 		t.FailNow()
 	}
-	e, err := pub.GenerateRandomElement()
-	if err != nil {
-		fmt.Println("Error generating random shared secret")
-		t.FailNow()
-	}
+	e := pub.GenerateRandomElement()
+
 	eb, _ := e.ToBytes()
 	fmt.Println("Plaintext (in)  = ", hex.EncodeToString(eb))
 	ct, err := pub.Encrypt(e, 10)
