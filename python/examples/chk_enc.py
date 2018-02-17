@@ -72,14 +72,15 @@ if (message is None) or (len(message) == 0):
 
 # derive a random shared key as sha256(Element().random().to_bytes)
 e = Element(pubkey).random()
+
 chachakey = sha256(e.to_bytes()).digest()
 
 # encrypt shared secret
 enckey = pubkey.encrypt(e, clargs.interval)
 
 # generate a random 64 bit 
-nonce = pysodium.randombytes(pysodium.crypto_aead_chacha20poly1305_NPUBBYTES)
-assert pysodium.crypto_aead_chacha20poly1305_NPUBBYTES == 8
+nonce = pysodium.randombytes(pysodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES)
+assert pysodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES == 12
 
 # write additional data into a single DER structure
 encoder = asn1.Encoder()
@@ -91,7 +92,7 @@ encoder.write(clargs.interval, asn1.Numbers.Integer)
 encoder.leave()
 AD = encoder.output()
 
-ctext = pysodium.crypto_aead_chacha20poly1305_encrypt(message.encode(), AD, nonce, chachakey)
+ctext = pysodium.crypto_aead_chacha20poly1305_ietf_encrypt(message=message.encode(), ad=AD, nonce=nonce, key=chachakey)
 
 # encode the whole contents, AD + ctext
 encoder = asn1.Encoder()

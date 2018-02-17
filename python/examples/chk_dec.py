@@ -107,6 +107,7 @@ except ValueError:
     sys.exit(1)
 chachakey = sha256(e.to_bytes()).digest()
 
-message = pysodium.crypto_aead_chacha20poly1305_decrypt(ctext, AD, nonce, chachakey)
+message = pysodium.crypto_aead_chacha20poly1305_ietf_decrypt(ciphertext=ctext,
+    ad=AD, nonce=nonce, key=chachakey)
 
 print(message.decode(), end='')

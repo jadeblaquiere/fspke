@@ -29,6 +29,7 @@
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <fspke.h>
+#include <pbc.h>
 #include <Python.h>
 #include <structmember.h>
 

@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
     char *der;
     int sz, result;
     element_t shared_element;
-    unsigned char shared_hash[crypto_aead_chacha20poly1305_KEYBYTES];
+    unsigned char shared_hash[crypto_aead_chacha20poly1305_ietf_KEYBYTES];
     unsigned char *kex_bytes, *ctext_bytes, *plain_bytes, *nonce_bytes;
     int kex_sz, ctext_sz, nonce_sz;
     unsigned long long plain_sz;
@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
     assert(ctext_sz > 0);
 
     // decrypt and authenticate MAC for message
-    result = crypto_aead_chacha20poly1305_decrypt(plain_bytes, &plain_sz,
+    result = crypto_aead_chacha20poly1305_ietf_decrypt(plain_bytes, &plain_sz,
         NULL, ctext_bytes, ctext_sz, (unsigned char *)der, sz, nonce_bytes, shared_hash);
     assert(result == 0);
     assert(plain_sz > 0);

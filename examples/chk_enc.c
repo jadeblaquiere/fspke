@@ -75,8 +75,8 @@ int main(int argc, char **argv) {
     char *der;
     int sz, bufsz, result;
     element_t shared_element;
-    unsigned char shared_hash[crypto_aead_chacha20poly1305_KEYBYTES];
-    unsigned char nonce[crypto_aead_chacha20poly1305_NPUBBYTES];
+    unsigned char shared_hash[crypto_aead_chacha20poly1305_ietf_KEYBYTES];
+    unsigned char nonce[crypto_aead_chacha20poly1305_ietf_NPUBBYTES];
 
 
     // pc is the context for all popt-related functions
@@ -196,14 +196,14 @@ int main(int argc, char **argv) {
     }
 
     // allocate sufficient buffer for ciphertext;
-    clen = msglen + crypto_aead_chacha20poly1305_ABYTES;
+    clen = msglen + crypto_aead_chacha20poly1305_ietf_ABYTES;
     ctext = (unsigned char *)malloc(clen * sizeof(char));
 
     // select a random nonce
     randombytes_buf(nonce, sizeof(nonce));
 
     // paranoid assertions... nonce 64 bits, hashed key 256 bits
-    assert(sizeof(nonce) == 8);
+    assert(sizeof(nonce) == 12);
     assert(sizeof(shared_hash) == 32);
     assert(der != NULL);
     assert(sz > 0);
@@ -260,7 +260,7 @@ int main(int argc, char **argv) {
 
         // AEAD symmetric encryption with shared key, MAC covers both message and
         // additional data (encrypted shared key (in der), nonce, interval).
-        result = crypto_aead_chacha20poly1305_encrypt(ctext, &clen, msg,
+        result = crypto_aead_chacha20poly1305_ietf_encrypt(ctext, &clen, msg,
             msglen, (unsigned char *)der, sz, NULL, nonce, shared_hash);
         assert(result == 0);
 
