@@ -59,3 +59,29 @@ and installed via the setup.py or pip using something *like* either of these:
     ```
     sudo pip3 install .
     ```
+
+The [python examples](python/examples) are intended to illustrate how the
+library can be used via the python bindings
+
+# Installing Go (golang) bindings
+
+Once the C library itself is installed, the Go bindings can be set up using a
+command *like* the following:
+
+```
+go get -d github.com/jadeblaquiere/fspke/fsgo
+```
+
+The [go examples](fsgo/cmd/) are intended to illustrate how the library can be
+used via the go bindings
+
+# running unit tests
+
+If you would like to verify that the libraries were built correctly you can
+execute all of the unit tests with commands *like*:
+
+```
+make check
+python3 ./tests/pytest_fspke.py
+(cd fsgo; go test)
+```

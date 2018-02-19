@@ -29,9 +29,9 @@ mkdir sodium-build
 cd sodium-build
 wget http://archive.ubuntu.com/ubuntu/pool/main/libs/libsodium/libsodium_1.0.16.orig.tar.gz
 tar xvf libsodium_1.0.16.orig.tar.gz
-cd libsodium_1.0.16
+cd libsodium-1.0.16
 autoreconf --install
-./configure --perfix=/usr
+./configure --prefix=/usr
 make
 sudo make install
 cd ../..
