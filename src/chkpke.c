@@ -41,6 +41,9 @@
 #include <string.h>
 #include <strings.h>
 
+// primality test will accept a composite with probability 4**(-reps)
+#define _MILLER_RABIN_REPS    (40)
+
 static int64_t _expi64(int64_t a, int64_t e) {
     assert(e >= 0);
     assert(e < 64);
@@ -78,12 +81,14 @@ static void _clear_chk_node(_sparseTree_t *node) {
 static void _clear_and_free_chk_node(_sparseTree_t *node) {
     _clear_chk_node(node);
     free(node->nodeData);
+    node->nodeData = NULL;
     return;
 }
 
 static void _init_chk_node(_sparseTree_t *node) {
     _chkpke_node_data_t *nd;
     nd = (_chkpke_node_data_t *)malloc(sizeof(_chkpke_node_data_t));
+    assert(nd != NULL);
     nd->S = NULL;
     nd->R = NULL;
     nd->nR = 0;
@@ -117,8 +122,8 @@ static void _CHKPKE_extract_a_params(CHKPKE_t chk) {
     chk->p_sign0 = p->sign0;
     // validate params
     // q, r prime?
-    assert(mpz_probab_prime_p(chk->q,20));
-    assert(mpz_probab_prime_p(chk->r,20));
+    assert(mpz_probab_prime_p(chk->q,_MILLER_RABIN_REPS));
+    assert(mpz_probab_prime_p(chk->r,_MILLER_RABIN_REPS));
     {
         // r * h == q + 1 ? ( as r * h - 1 == q ? )
         mpz_t acc, t;
@@ -164,6 +169,7 @@ static void _pbc_element_G1_from_affine_mpz(element_t e, mpz_t x, mpz_t y, pairi
     element_init_G1(e, p);
     ll = element_length_in_bytes_x_only(e);
     buffer = (char *)malloc(2 * ll * sizeof(char));
+    assert(buffer != NULL);
     // get size in bytes from size in bits (base 2)
     lb = (mpz_sizeinbase(x,2) + 7) / 8;
     assert(lb <= ll);
@@ -317,6 +323,7 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     nd->nR = 0;
     nd->R = (element_ptr)NULL;
     nd->S = (element_ptr)malloc(sizeof(element_t));
+    assert(nd->S != NULL);
     //printf("writing secret to node(0)\n");
     element_init_G1(nd->S, chk->pairing);
     element_mul_zn(nd->S, e_pt, alpha);
@@ -355,14 +362,14 @@ static int _asn1_write_mpz_as_octet_string(asn1_node root, char *attribute, mpz_
     mpz_export(buffer, &lwrote, 1, sizeof(char), 0, 0, value);
     assert(lwrote == length);
     result = asn1_write_value(root, attribute, buffer, lwrote);
-    if (result != ASN1_SUCCESS) {
-        int i;
-        printf("error writing ");
-        for (i = 0; i < lwrote; i++) {
-            printf("%02X", buffer[i]);
-        }
-        printf(" to tag : %s\n", attribute);
-    }
+    //if (result != ASN1_SUCCESS) {
+    //    int i;
+    //    printf("error writing ");
+    //    for (i = 0; i < lwrote; i++) {
+    //        printf("%02X", buffer[i]);
+    //    }
+    //    printf(" to tag : %s\n", attribute);
+    //}
     assert(result == ASN1_SUCCESS);
     free(buffer);
     return 5 + length;
@@ -414,16 +421,18 @@ static int _asn1_write_mpECP_as_octet_string(asn1_node root, char *attribute, mp
     length = mpECP_out_strlen(value,1);
     assert((length % 2) == 0);
     sbuffer = (char *)malloc((length + 1) * sizeof(char));
+    assert(sbuffer != NULL);
     buffer = (char *)malloc(((length >> 1) + 1) * sizeof(char));
+    assert(buffer != NULL);
     mpECP_out_str(sbuffer, value, 1);
     for (i = 0 ; i < (length >> 1); i++) {
         result = sscanf(&sbuffer[i << 1],"%2hhx",&buffer[i]);
         assert(result == 1);
     }
     result = asn1_write_value(root, attribute, buffer, (length >> 1));
-    if (result != 0) {
-        printf("error writing %s to %s\n", sbuffer, attribute);
-    }
+    //if (result != 0) {
+    //    printf("error writing %s to %s\n", sbuffer, attribute);
+    //}
     assert(result == 0);
     free(buffer);
     free(sbuffer);
@@ -443,6 +452,7 @@ static int _asn1_write_element_t_as_CurvePoint(asn1_node root, char *attribute, 
     _pbc_element_G1_to_affine_mpz(x, y, value);
     len = strlen(attribute) + 5;
     buffer = (char *)malloc((len + 1)*sizeof(char));
+    assert(buffer != NULL);
 
     strncpy(buffer, attribute, len);
     strncat(buffer, ".x", 5);
@@ -471,12 +481,13 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
     sum = 0;
 
     result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+    assert(result == 0);
 
-    if (result != 0) {
-        asn1_perror (result);
-        printf ("%s", asnError);
-        assert(result == 0);
-    }
+    //if (result != 0) {
+    //    asn1_perror (result);
+    //    printf ("%s", asnError);
+    //    assert(result == 0);
+    //}
 
     // create an empty ASN1 structure
     result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKPublicKey",
@@ -552,6 +563,7 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
     sum += 256;  // pad for DER header + some extra just in case
     length = sum;
     buffer = (char *)malloc((sum) * sizeof(char));
+    assert(buffer != NULL);
     result = asn1_der_coding(pubkey_asn1, "", buffer, &length, asnError);
     assert(result == 0);
     assert(length < sum);
@@ -598,7 +610,9 @@ static int _CHKPKE_der_for_node(CHKPKE_t chk, int depth, int64_t ordinal) {
     //printf("Der for (%d, %ld)\n", node->depth, node->ordinal);
 
     nd->S = (element_ptr)malloc(sizeof(struct element_s));
+    assert(nd->S != NULL);
     nd->R = (element_ptr)malloc(depth*sizeof(struct element_s));
+    assert(nd->R != NULL);
     nd->nR = depth;
     {
         int i;
@@ -646,7 +660,7 @@ int CHKPKE_Der(CHKPKE_t chk, int64_t interval) {
     return _CHKPKE_der_for_node(chk, chk->depth, interval);
 }
 
-// simple singly linked list
+// simple singly linked list of references to node data
 typedef struct __chkpke_node_config_t {
     _chkpke_node_data_t *nd;
     int depth;
@@ -734,17 +748,9 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
         }
     }
 
-    // encode node + right from current level
-    //upstart = start + ((chk->order - (start % chk->order)) % chk->order) ;
-    //upend  = (end + 1) - ((end + 1) % chk->order) ;
-
-    //printf("upstart, upend = %ld, %ld\n", upstart, upend);
-    //printf("startstop, beginend = %ld, %ld\n", startstop, beginend);
-
-    //printf("building keylist\n");
-
     for (i = start; i <= startstop; i++) {
         nconfig = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
+        assert(nconfig != NULL);
         if (head == NULL) {
             head = nconfig;
             next = head;
@@ -765,6 +771,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
 
     for (i = beginend; i <= end; i++) {
         nconfig = (_chkpke_node_config_t *)malloc(sizeof(_chkpke_node_config_t));
+        assert(nconfig != NULL);
         if (head == NULL) {
             head = nconfig;
             next = head;
@@ -1051,43 +1058,46 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     
     //printf("privkey export : pubkey complete\n");
 
-    nextkey = keylist;
-    while (nextkey != NULL) {
-        int i;
+    {
         mpECP_t pt;
-
-        //printf("writing key for (%d, %ld)\n", nextkey->depth, nextkey->ordinal);
-
         mpECP_init(pt);
-        // create a new secret
-        result = asn1_write_value (privkey_asn1, "secrets", "NEW", 1);
-        assert(result == 0);
-        sum += 12;
+        nextkey = keylist;
+        while (nextkey != NULL) {
+            int i;
 
-        sum += _asn1_write_int64_as_integer(privkey_asn1, "secrets.?LAST.id.depth", nextkey->depth);
-        sum += _asn1_write_int64_as_integer(privkey_asn1, "secrets.?LAST.id.ordinal", nextkey->ordinal);
+            //printf("writing key for (%d, %ld)\n", nextkey->depth, nextkey->ordinal);
 
-        // sanity check... for nodes with secrets, nR should = depth
-        assert(nextkey->nd->nR == nextkey->depth);
-
-        for (i = 0; i < nextkey->nd->nR; i++) {
-            result = asn1_write_value (privkey_asn1, "secrets.?LAST.r", "NEW", 1);
+            // create a new secret
+            result = asn1_write_value (privkey_asn1, "secrets", "NEW", 1);
             assert(result == 0);
+            sum += 12;
 
-            _mpECP_set_pbc_element(pt, &(nextkey->nd->R[i]), chk->C);
-            sum += _asn1_write_mpECP_as_octet_string(privkey_asn1, "secrets.?LAST.r.?LAST", pt);
+            sum += _asn1_write_int64_as_integer(privkey_asn1, "secrets.?LAST.id.depth", nextkey->depth);
+            sum += _asn1_write_int64_as_integer(privkey_asn1, "secrets.?LAST.id.ordinal", nextkey->ordinal);
+
+            // sanity check... for nodes with secrets, nR should = depth
+            assert(nextkey->nd->nR == nextkey->depth);
+
+            for (i = 0; i < nextkey->nd->nR; i++) {
+                result = asn1_write_value (privkey_asn1, "secrets.?LAST.r", "NEW", 1);
+                assert(result == 0);
+
+                _mpECP_set_pbc_element(pt, &(nextkey->nd->R[i]), chk->C);
+                sum += _asn1_write_mpECP_as_octet_string(privkey_asn1, "secrets.?LAST.r.?LAST", pt);
+            }
+
+            _mpECP_set_pbc_element(pt, nextkey->nd->S, chk->C);
+            sum += _asn1_write_mpECP_as_octet_string(privkey_asn1, "secrets.?LAST.s", pt);
+            nextkey = nextkey->next;
         }
-
-        _mpECP_set_pbc_element(pt, nextkey->nd->S, chk->C);
-        sum += _asn1_write_mpECP_as_octet_string(privkey_asn1, "secrets.?LAST.s", pt);
         mpECP_clear(pt);
-        nextkey = nextkey->next;
     }
 
     // validate export
     sum += 256;  // pad for DER header + some extra just in case
     length = sum;
     buffer = (char *)malloc((sum) * sizeof(char));
+    assert(buffer != NULL);
     result = asn1_der_coding(privkey_asn1, "", buffer, &length, asnError);
     assert(result == 0);
     assert(length < sum);
@@ -1125,6 +1135,7 @@ static int _asn1_read_mpz_from_octet_string(mpz_t value, asn1_node root, char *a
     //assert(length > 0);
     // allocate
     buffer = (char *)malloc((length+1)*sizeof(char));
+    assert(buffer != NULL);
     lread = length + 1;
     result = asn1_read_value(root, attribute, buffer, &lread);
     if (result != ASN1_SUCCESS) goto cleanup_on_error;
@@ -1155,12 +1166,14 @@ static int _asn1_read_mpECP_from_octet_string(mpECP_t value, asn1_node root, cha
     //assert(length > 0);
     // allocate
     buffer = (char *)malloc((length+1)*sizeof(char));
+    assert(buffer != NULL);
     lread = length + 1;
     result = asn1_read_value(root, attribute, buffer, &lread);
     if (result != ASN1_SUCCESS) goto cleanup_on_error;
     //assert(result == 0);
     if (lread != length) goto cleanup_on_error;
     sbuffer = (char *)malloc(((length * 2)+1) * sizeof(char));
+    assert(sbuffer != NULL);
     //assert(lread == length);
     {
         int i;
@@ -1270,6 +1283,7 @@ static int _asn1_read_element_t_from_CurvePoint(element_t value, asn1_node root,
 
     len = strlen(attribute) + 5;
     abuffer = (char *)malloc((len + 1)*sizeof(char));
+    assert(abuffer != NULL);
 
     // call read_value with NULL buffer to get length
     strncpy(abuffer, attribute, len);
@@ -1287,6 +1301,7 @@ static int _asn1_read_element_t_from_CurvePoint(element_t value, asn1_node root,
     assert(len_element >= length);
     //printf("allocating space for 2x %d-bit x,y values\n", (length * 8));
     buffer = (char *)malloc(((len_element * 2) + 1)*sizeof(char));
+    assert(buffer != NULL);
     bzero(buffer, len_element * 2);
 
     lread = length + 1;
@@ -1347,6 +1362,7 @@ static char *_gen_pbc_param_a_string(CHKPKE_t chk) {
     // assume exp2, exp1, sign1, sign0 all <10 bytes
     sz = 48 + ((chk->p_exp2 * 3) / 4) + (4 * 10);
     buffer = (char *)malloc(sz * sizeof(char));
+    assert(buffer != NULL);
 
     gmp_sprintf(buffer,
         "type a\nq %Zd\nh %Zd\nr %Zd\nexp2 %d\nexp1 %d\nsign1 %d\nsign0 %d\n",
@@ -1371,12 +1387,13 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     //char *buffer;
 
     result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+    assert(result == 0);
 
-    if (result != 0) {
-        asn1_perror (result);
-        printf ("%s", asnError);
-        assert(result == 0);
-    }
+    //if (result != 0) {
+    //    asn1_perror (result);
+    //    printf ("%s", asnError);
+    //    assert(result == 0);
+    //}
 
     // create an empty ASN1 structure
     result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKPublicKey",
@@ -1433,9 +1450,9 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     //printf("-----\nParams\n-----\n%s-----\n", param_string);
 
     result = pbc_param_init_set_str(chk->param, param_string);
-    assert(result == 0);
-    if (result != 0) goto error_cleanup1;
+    //assert(result == 0);
     free(param_string);
+    if (result != 0) goto error_cleanup1;
 
     //printf("init pairing\n");
     pairing_init_pbc_param(chk->pairing, chk->param);
@@ -1584,12 +1601,13 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     //char *buffer;
 
     result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+    assert(result == 0);
 
-    if (result != 0) {
-        asn1_perror (result);
-        printf ("%s", asnError);
-        assert(result == 0);
-    }
+    //if (result != 0) {
+    //    asn1_perror (result);
+    //    printf ("%s", asnError);
+    //    assert(result == 0);
+    //}
 
     // create an empty ASN1 structure
     result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKPrivateKey",
@@ -1646,9 +1664,9 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     //printf("-----\nParams\n-----\n%s-----\n", param_string);
 
     result = pbc_param_init_set_str(chk->param, param_string);
-    assert(result == 0);
-    if (result != 0) goto error_cleanup1;
+    //assert(result == 0);
     free(param_string);
+    if (result != 0) goto error_cleanup1;
 
     //printf("init pairing\n");
     pairing_init_pbc_param(chk->pairing, chk->param);
@@ -1746,7 +1764,7 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     _CHKPKE_precalc_H0(e_pt, chk);
     element_init_GT(chk->eQH, chk->pairing);
     element_pairing(chk->eQH, chk->Q, e_pt);
-    chk->is_secret = false;
+    chk->is_secret = true;
     //printf("pubkey init complete\n");
     
     {
@@ -1758,7 +1776,7 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
         mpECP_init(ecp_pt);
         i = 1;
         while (true) {
-            char abuffer[80];
+            char abuffer[256];
             int j, depth;
             int64_t ordinal;
 
@@ -1769,7 +1787,6 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
 
             sprintf(abuffer, "secrets.?%d.id.ordinal", i);
             result = _asn1_read_int64_from_integer(&ordinal, privkey_asn1, abuffer);
-            // TODO: remove this assert
             assert(result == 0);
             if (result != 0) {
                 mpECP_clear(ecp_pt);
@@ -1793,7 +1810,6 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
 
             sprintf(abuffer, "secrets.?%d.s", i);
             result = _asn1_read_mpECP_from_octet_string(ecp_pt, privkey_asn1, abuffer, chk->C);
-            // TODO: remove this assert
             assert(result == 0);
             if (result != 0) {
                 mpECP_clear(ecp_pt);
@@ -1805,7 +1821,6 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
             for (j = 0; j < depth; j++) {
                 sprintf(abuffer, "secrets.?%d.r.?%d", i, j + 1);
                 result = _asn1_read_mpECP_from_octet_string(ecp_pt, privkey_asn1, abuffer, chk->C);
-                // TODO: remove this assert
                 assert(result == 0);
                 if (result != 0) {
                     mpECP_clear(ecp_pt);
@@ -1885,12 +1900,13 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
     if ((interval < 0) || (interval > chk->maxinterval)) return NULL;
 
     result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+    assert(result == 0);
 
-    if (result != 0) {
-        asn1_perror (result);
-        printf ("%s", asnError);
-        assert(result == 0);
-    }
+    //if (result != 0) {
+    //    asn1_perror (result);
+    //    printf ("%s", asnError);
+    //    assert(result == 0);
+    //}
 
     // create an empty ASN1 structure
     result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKCiphertext",
@@ -1983,6 +1999,7 @@ static int _asn1_read_element_gt_from_xy(element_t value, asn1_node root, char *
 
     len = strlen(attribute) + 5;
     abuffer = (char *)malloc((len + 1)*sizeof(char));
+    assert(abuffer != NULL);
 
     // call read_value with NULL buffer to get length
     strncpy(abuffer, attribute, len);
@@ -2000,6 +2017,7 @@ static int _asn1_read_element_gt_from_xy(element_t value, asn1_node root, char *
     assert(len_element >= length);
     //printf("allocating space for 2x %d-bit x,y values\n", (length * 8));
     buffer = (char *)malloc(((len_element * 2) + 1)*sizeof(char));
+    assert(buffer != NULL);
     bzero(buffer, len_element * 2);
 
     lread = length + 1;
@@ -2058,7 +2076,7 @@ int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int64_t 
     int i, result;
     sparseTree_ptr_t node;
     _chkpke_node_data_t *nd;
-    char abuffer[80];
+    char abuffer[256];
     mpz_t rmin1, x, y;
 
     mpECP_t ecp_pt;
@@ -2077,12 +2095,13 @@ int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int64_t 
     assert(nd->nR == chk->depth);
 
     result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
+    assert(result == 0);
 
-    if (result != 0) {
-        asn1_perror (result);
-        printf ("%s", asnError);
-        assert(result == 0);
-    }
+    //if (result != 0) {
+    //    asn1_perror (result);
+    //    printf ("%s", asnError);
+    //    assert(result == 0);
+    //}
 
     // create an empty ASN1 structure
     result = asn1_create_element(CHKPKE_asn1, "ForwardSecurePKE.CHKCiphertext",
