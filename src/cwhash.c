@@ -102,6 +102,6 @@ void cwHash_hashval(mpz_t hash, cwHash_t cwh, mpz_t x) {
     mpz_mod(y, y, cwh->q);
     mpz_set(hash, y);
     mpz_clear(y);
-    mpFp_init(xf);
+    mpFp_clear(xf);
     return;
 }
