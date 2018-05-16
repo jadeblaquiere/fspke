@@ -35,6 +35,7 @@ import "os"
 func ExitOnError(err error, msg string) {
 	if err != nil {
 		os.Stderr.WriteString(msg)
+		os.Stderr.WriteString("\n")
 		os.Exit(1)
 	}
 }
