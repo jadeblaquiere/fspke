@@ -231,7 +231,8 @@ static void _CHKPKE_setup_ECurve(CHKPKE_t chk, int qbits) {
     mpz_set_ui(b, 0);
     _pbc_element_G1_to_affine_mpz(x, y, chk->P);
     mpECurve_set_mpz_ws(chk->C, chk->q, a, b, chk->r, chk->h, x, y, qbits);
-    // extra validation step, ensure Q also on curve C
+    // extra validation step, ensure P, Q also on curve C
+    assert(mpECurve_point_check(chk->C, x, y));
     _pbc_element_G1_to_affine_mpz(x, y, chk->Q);
     assert(mpECurve_point_check(chk->C, x, y));
     mpz_clear(y);
@@ -244,7 +245,7 @@ static void _CHKPKE_setup_ECurve(CHKPKE_t chk, int qbits) {
 static void _CHKPKE_precalc_H0(element_t e_pt, CHKPKE_t chk) {
     mpECP_t ecp_pt;
 
-    mpECP_init(ecp_pt);
+    mpECP_init(ecp_pt, chk->C);
     {
         uint64_t id;
         mpz_t x;
@@ -306,7 +307,7 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     _CHKPKE_setup_ECurve(chk, mpz_sizeinbase(chk->q,2));
     // create a new (random) hash function on curve C
     //printf("initializing random hash function\n");
-    icartHash_init(chk->H);
+    icartHash_init(chk->H, chk->C);
     icartHash_urandom(chk->H, chk->C);
     // initialize btree of order(# subnodes per node) = order
     //printf("initializing sparse tree\n");
@@ -314,6 +315,7 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order) {
     // precalculate pairing of Q and H(root node id = 0);
     assert(sparseTree_node_id(chk->tree) == 0);
     element_init_G1(e_pt, chk->pairing);
+    //printf("before precalc pairing eQH\n");
     _CHKPKE_precalc_H0(e_pt, chk);
     //printf("precalc pairing eQH\n");
     element_init_GT(chk->eQH, chk->pairing);
@@ -512,8 +514,8 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
 
     //{
     //    mpECP_t ppt, qpt;
-    //    mpECP_init(ppt);
-    //    mpECP_init(qpt);
+    //    mpECP_init(ppt, chk->C);
+    //    mpECP_init(qpt, chk->C);
     //    _mpECP_set_pbc_element(ppt, chk->P, chk->C);
     //    sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pPt", ppt);
     //    _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
@@ -623,11 +625,12 @@ static int _CHKPKE_der_for_node(CHKPKE_t chk, int depth, int64_t ordinal) {
         element_init_Zr(pw, chk->pairing);
         element_init_G1(Hcp, chk->pairing);
         element_init_G1(Hpw, chk->pairing);
-        mpECP_init(H);
+        mpECP_init(H, chk->C);
 
         _mpz_set_ull(x, sparseTree_node_id(node));
         //printf("calculating Hash\n");
         icartHash_hashval(H, chk->H, x);
+        //printf("hash calculated, setting element = H\n");
         _pbc_element_set_mpECP(Hcp, H, chk->pairing);
         element_random(pw);
 
@@ -696,6 +699,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
         return (_chkpke_node_config_t *)NULL;
     }
 
+    //printf("der success\n");
     if ((start % chk->order) == 0) {
         // start on block boundary
         if ((end - start) >= chk->order) {
@@ -760,7 +764,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
             next = nconfig;
         }
         nconfig->next = (_chkpke_node_config_t *)NULL;
-        //printf("node @ (%d, %ld)\n", depth, i);
+        //printf("s:node @ (%d, %ld)\n", depth, i);
         // must call _der_for_node to populate R,S in nodeData
         assert(_CHKPKE_der_for_node(chk, depth, i) == 0);
         node = sparseTree_find_by_address(chk->tree, depth, i);
@@ -781,7 +785,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
             next = nconfig;
         }
         nconfig->next = (_chkpke_node_config_t *)NULL;
-        //printf("node @ (%d, %ld)\n", depth, i);
+        //printf("e:node @ (%d, %ld)\n", depth, i);
         // must call _der_for_node to populate R,S in nodeData
         assert(_CHKPKE_der_for_node(chk, depth, i) == 0);
         node = sparseTree_find_by_address(chk->tree, depth, i);
@@ -973,10 +977,12 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     // input validation
     if ((start < 0) || (start > end) || (end > chk->maxinterval)) return NULL;
 
+    //printf("obtaining keylist\n");
     keylist = _CHKPKE_keylist_for_start_end(chk, start, end);
     if (keylist == (_chkpke_node_config_t *)NULL) {
         return (char *)NULL;
     }
+    //printf("obtained keylist\n");
 
     result = asn1_array2tree(fspke_asn1_tab, &CHKPKE_asn1, asnError);
 
@@ -1009,8 +1015,8 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
 
     //{
     //    mpECP_t ppt, qpt;
-    //    mpECP_init(ppt);
-    //    mpECP_init(qpt);
+    //    mpECP_init(ppt, chk->C);
+    //    mpECP_init(qpt, chk->C);
     //    _mpECP_set_pbc_element(ppt, chk->P, chk->C);
     //    sum += _asn1_write_mpECP_as_octet_string(pubkey_asn1, "pPt", ppt);
     //    _mpECP_set_pbc_element(qpt, chk->Q, chk->C);
@@ -1060,7 +1066,7 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
 
     {
         mpECP_t pt;
-        mpECP_init(pt);
+        mpECP_init(pt, chk->C);
         nextkey = keylist;
         while (nextkey != NULL) {
             int i;
@@ -1466,8 +1472,8 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     element_init_G1(chk->Q,chk->pairing);
     element_init_GT(chk->ePQ,chk->pairing);
     mpECurve_init(hcv);
-    cwHash_init(cwa);
-    cwHash_init(cwb);
+    cwHash_init(cwa, chk->q);
+    cwHash_init(cwb, chk->q);
     mpz_init(p);
     mpz_init(a);
     mpz_init(b);
@@ -1543,7 +1549,8 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     //gmp_printf("cwb.b parsed as : %Zd (0x%Zx)\n", b, b);
     cwHash_set_mpz(cwb, chk->r, p, a, b);
 
-    icartHash_init(chk->H);
+    assert(mpECurve_cmp(hcv, chk->C) == 0);
+    icartHash_init(chk->H, hcv);
     icartHash_set_param(chk->H, hcv, cwa, cwb);
     sparseTree_init(chk->tree, chk->order, _init_chk_node);
     element_init_G1(e_pt, chk->pairing);
@@ -1680,8 +1687,8 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     element_init_G1(chk->Q,chk->pairing);
     element_init_GT(chk->ePQ,chk->pairing);
     mpECurve_init(hcv);
-    cwHash_init(cwa);
-    cwHash_init(cwb);
+    cwHash_init(cwa, chk->q);
+    cwHash_init(cwb, chk->q);
     mpz_init(p);
     mpz_init(a);
     mpz_init(b);
@@ -1757,7 +1764,7 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     //gmp_printf("cwb.b parsed as : %Zd (0x%Zx)\n", b, b);
     cwHash_set_mpz(cwb, chk->r, p, a, b);
 
-    icartHash_init(chk->H);
+    icartHash_init(chk->H, hcv);
     icartHash_set_param(chk->H, hcv, cwa, cwb);
     sparseTree_init(chk->tree, chk->order, _init_chk_node);
     element_init_G1(e_pt, chk->pairing);
@@ -1773,7 +1780,7 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
         _sparseTree_t *node;
         mpECP_t ecp_pt;
 
-        mpECP_init(ecp_pt);
+        mpECP_init(ecp_pt, chk->C);
         i = 1;
         while (true) {
             char abuffer[256];
@@ -1917,7 +1924,7 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
     //asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
     //printf("-----------------\n");
 
-    mpECP_init(ecp_pt);
+    mpECP_init(ecp_pt, chk->C);
     element_init_Zr(lambda, chk->pairing);
     element_init_G1(lambdaP, chk->pairing);
     element_init_GT(d, chk->pairing);
@@ -2120,7 +2127,7 @@ int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int64_t 
     //asn1_print_structure(stdout, ciphertext_asn1, "", ASN1_PRINT_ALL);
     //printf("-----------------\n");
 
-    mpECP_init(ecp_pt);
+    mpECP_init(ecp_pt, chk->C);
     element_init_G1(e_pt, chk->pairing);
     element_init_GT(e_gt, chk->pairing);
     element_init_GT(eU0Sw, chk->pairing);

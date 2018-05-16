@@ -53,12 +53,14 @@ START_TEST(test_cwh)
     mpz_init(hx);
     mpz_init(y);
     mpz_init(hy);
-    cwHash_init(cwh);
 
     mpz_set_ui(p, 251);
     mpz_set_ui(q, 31);
     mpz_urandom(a, p);
     mpz_urandom(b, p);
+
+    cwHash_init(cwh, p);
+
     cwHash_set_mpz(cwh, q, p, a, b);
     
     for (j = 0; j < 251; j++) {
@@ -131,9 +133,9 @@ START_TEST(test_cwh_urandom)
     mpz_init(hx);
     mpz_init(y);
     mpz_init(hy);
-    cwHash_init(cwh);
 
     mpz_set_ui(q, 31);
+    cwHash_init(cwh, q);
     cwHash_urandom(cwh, q);
     p = mpz_get_ui(cwh->p);
     //printf("p = %d\n", p);
@@ -179,13 +181,13 @@ START_TEST(test_cwh_set)
     mpz_init(hx);
     mpz_init(y);
     mpz_init(hy);
-    cwHash_init(cwh);
-    cwHash_init(cwh_cp);
 
     mpz_set_ui(p, 251);
     mpz_set_ui(q, 31);
     mpz_urandom(a, p);
     mpz_urandom(b, p);
+    cwHash_init(cwh, p);
+    cwHash_init(cwh_cp, p);
     cwHash_set_mpz(cwh, q, p, a, b);
     cwHash_set(cwh_cp, cwh);
     

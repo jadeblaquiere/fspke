@@ -61,7 +61,7 @@ typedef struct {
 
 typedef _icartHash_t icartHash_t[1];
 
-void icartHash_init(icartHash_t ih);
+void icartHash_init(icartHash_t ih, mpECurve_t cv);
 void icartHash_clear(icartHash_t ih);
 
 void icartHash_set(icartHash_t rih, icartHash_t ih);

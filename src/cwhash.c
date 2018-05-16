@@ -33,15 +33,17 @@
 #include <field.h>
 #include <gmp.h>
 #include <mpzurandom.h>
+#include <stdlib.h>
 
 // primality test will accept a composite with probability 4**(-reps)
 #define _MILLER_RABIN_REPS    (40)
 
-void cwHash_init(cwHash_t cwh) {
+void cwHash_init(cwHash_t cwh, mpz_t p) {
     mpz_init(cwh->p);
+    mpz_set(cwh->p, p);
     mpz_init(cwh->q);
-    mpFp_init(cwh->a);
-    mpFp_init(cwh->b);
+    mpFp_init(cwh->a, cwh->p);
+    mpFp_init(cwh->b, cwh->p);
     return;
 }
 
@@ -93,9 +95,9 @@ void cwHash_urandom(cwHash_t cwh, mpz_t q) {
 void cwHash_hashval(mpz_t hash, cwHash_t cwh, mpz_t x) {
     mpFp_t xf;
     mpz_t y;
-    mpFp_init(xf);
+    mpFp_init_fp(xf, cwh->a->fp);
     mpz_init(y);
-    mpFp_set_mpz(xf, x, cwh->p);
+    mpFp_set_mpz_fp(xf, x, cwh->a->fp);
     mpFp_mul(xf, xf, cwh->a);
     mpFp_add(xf, xf, cwh->b);
     mpz_set_mpFp(y, xf);

@@ -94,15 +94,15 @@ START_TEST(test_ih_urandom)
     mpz_init(b);
     mpz_init(x);
     mpz_init(y);
-    mpECP_init(A);
-    mpECP_init(B);
     mpECurve_init(cv);
-    icartHash_init(ih);
-    icartHash_init(ih_cp);
     
     ncurves = sizeof(test_curve)/sizeof(test_curve[0]);
     for (i = 0; i < ncurves; i++) {
         mpECurve_set_str_ws(cv, test_curve[i].p, test_curve[i].a, test_curve[i].b, test_curve[i].n, test_curve[i].h, test_curve[i].Gx, test_curve[i].Gy, test_curve[i].bits);
+        mpECP_init(A, cv);
+        mpECP_init(B, cv);
+        icartHash_init(ih, cv);
+        icartHash_init(ih_cp, cv);
         icartHash_urandom(ih, cv);
         icartHash_set(ih_cp, ih);
         for (j = 0; j < 100; j++) {
@@ -124,13 +124,13 @@ START_TEST(test_ih_urandom)
             if (!A->is_neutral) assert(mpECurve_point_check(cv, x, y));
             free(buffer);
         }
+        icartHash_clear(ih_cp);
+        icartHash_clear(ih);
+        mpECP_clear(B);
+        mpECP_clear(A);
     }
 
-    icartHash_clear(ih_cp);
-    icartHash_clear(ih);
     mpECurve_clear(cv);
-    mpECP_clear(B);
-    mpECP_clear(A);
     mpz_clear(y);
     mpz_clear(x);
     mpz_clear(b);
@@ -150,15 +150,15 @@ START_TEST(test_ih_first20)
     mpz_init(b);
     mpz_init(x);
     mpz_init(y);
-    mpECP_init(A);
-    mpECP_init(B);
     mpECurve_init(cv);
-    icartHash_init(ih);
-    icartHash_init(ih_cp);
 
     ncurves = sizeof(test_curve)/sizeof(test_curve[0]);
     for (i = 0; i < ncurves; i++) {
         mpECurve_set_str_ws(cv, test_curve[i].p, test_curve[i].a, test_curve[i].b, test_curve[i].n, test_curve[i].h, test_curve[i].Gx, test_curve[i].Gy, test_curve[i].bits);
+        mpECP_init(A, cv);
+        mpECP_init(B, cv);
+        icartHash_init(ih, cv);
+        icartHash_init(ih_cp, cv);
         icartHash_urandom(ih, cv);
         icartHash_set(ih_cp, ih);
         for (j = 0; j < 20; j++) {
@@ -180,13 +180,13 @@ START_TEST(test_ih_first20)
             if (!A->is_neutral) assert(mpECurve_point_check(cv, x, y));
             free(buffer);
         }
+        icartHash_clear(ih_cp);
+        icartHash_clear(ih);
+        mpECP_clear(B);
+        mpECP_clear(A);
     }
 
-    icartHash_clear(ih_cp);
-    icartHash_clear(ih);
     mpECurve_clear(cv);
-    mpECP_clear(B);
-    mpECP_clear(A);
     mpz_clear(y);
     mpz_clear(x);
     mpz_clear(b);

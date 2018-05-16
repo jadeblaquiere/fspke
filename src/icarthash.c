@@ -33,14 +33,16 @@
 #include <field.h>
 #include <gmp.h>
 #include <icarthash.h>
+#include <stdlib.h>
 
-void icartHash_init(icartHash_t ih) {
+void icartHash_init(icartHash_t ih, mpECurve_t cv) {
     mpECurve_init(ih->cv);
-    cwHash_init(ih->cwa);
-    cwHash_init(ih->cwb);
-    mpECP_init(ih->pt);
-    mpFp_init(ih->precalc1_3);
-    mpFp_init(ih->precalc1_27);
+    mpECurve_set(ih->cv, cv);
+    cwHash_init(ih->cwa, cv->n);
+    cwHash_init(ih->cwb, cv->n);
+    mpECP_init(ih->pt, cv);
+    mpFp_init_fp(ih->precalc1_3, cv->fp);
+    mpFp_init_fp(ih->precalc1_27, cv->fp);
     mpz_init(ih->precalc_cubert);
     return;
 }
@@ -60,21 +62,22 @@ static void _icartHash_precalc(icartHash_t rih) {
     mpz_t t;
     mpFp_t s;
     mpz_init(t);
-    mpFp_init(s);
-    mpz_mod_ui(t, rih->cv->p, 3);
+    mpz_mod_ui(t, rih->cv->fp->p, 3);
     // cube root by exponentiation assumes p = 2 mod 3
     assert(mpz_get_ui(t) == 2);
     // 3**(-1) mod p 
-    mpFp_set_ui(rih->precalc1_3, 3, rih->cv->p);
+    mpFp_set_ui_fp(rih->precalc1_3, 3, rih->cv->fp);
     mpFp_inv(rih->precalc1_3, rih->precalc1_3);
     // 27**(-1) mod p
-    mpFp_set_ui(rih->precalc1_27, 27, rih->cv->p);
+    mpFp_set_ui_fp(rih->precalc1_27, 27, rih->cv->fp);
     mpFp_inv(rih->precalc1_27, rih->precalc1_27);
     // 3**(-1) mod (p-1) -> see https://en.wikipedia.org/wiki/Cubic_reciprocity
-    mpz_sub_ui(t, rih->cv->p, 1);
+    mpz_sub_ui(t, rih->cv->fp->p, 1);
+    mpFp_init(s, t);
     mpFp_set_ui(s, 3, t);
     mpFp_inv(s, s);
-    mpz_set(rih->precalc_cubert, s->i);
+    mpz_set_mpFp(t, s);
+    mpz_set(rih->precalc_cubert, t);
     mpFp_clear(s);
     mpz_clear(t);
 }
@@ -84,6 +87,7 @@ void icartHash_set(icartHash_t rih, icartHash_t ih) {
     cwHash_set(rih->cwa, ih->cwa);
     cwHash_set(rih->cwb, ih->cwb);
     mpECP_set(rih->pt, ih->pt);
+    mpECP_scalar_base_mul_setup(rih->pt);
     _icartHash_precalc(rih);
     return;
 }
@@ -96,7 +100,7 @@ void icartHash_set_param(icartHash_t rih, mpECurve_t cv, cwHash_t cwha, cwHash_t
     cwHash_set(rih->cwa, cwha);
     cwHash_set(rih->cwb, cwhb);
     assert(mpECurve_point_check(cv, cv->G[0], cv->G[1]));
-    mpECP_set_mpz(rih->pt, cv->G[0], cv->G[1], cv);
+    mpECP_set_mpz(rih->pt, cv->G[0], cv->G[1], rih->cv);
     mpECP_scalar_base_mul_setup(rih->pt);
     _icartHash_precalc(rih);
     return;
@@ -104,8 +108,8 @@ void icartHash_set_param(icartHash_t rih, mpECurve_t cv, cwHash_t cwha, cwHash_t
 
 void icartHash_urandom(icartHash_t rih, mpECurve_t cv) {
     cwHash_t a, b;
-    cwHash_init(a);
-    cwHash_init(b);
+    cwHash_init(a, cv->n);
+    cwHash_init(b, cv->n);
     cwHash_urandom(a, cv->n);
     cwHash_urandom(b, cv->n);
     icartHash_set_param(rih, cv, a, b);
@@ -118,12 +122,12 @@ void icartHash_urandom(icartHash_t rih, mpECurve_t cv) {
 
 static void _icartHash_deterministic_map(mpECP_t hx, icartHash_t ih, mpz_t x) {
     mpFp_t u, v, s, t;
-    mpFp_init(u);
-    mpFp_init(v);
-    mpFp_init(s);
-    mpFp_init(t);
+    mpFp_init_fp(u, ih->cv->fp);
+    mpFp_init_fp(v, ih->cv->fp);
+    mpFp_init_fp(s, ih->cv->fp);
+    mpFp_init_fp(t, ih->cv->fp);
     // v = (3*a - u**4) / (6*u)
-    mpFp_set_mpz(u, x, ih->cv->p);
+    mpFp_set_mpz(u, x, ih->cv->fp->p);
     mpFp_mul_ui(v, ih->cv->coeff.ws.a, 3);
     mpFp_pow_ui(t, u, 4);
     mpFp_sub(v, v, t);
@@ -137,7 +141,7 @@ static void _icartHash_deterministic_map(mpECP_t hx, icartHash_t ih, mpz_t x) {
     mpFp_pow_ui(t, u, 6);
     mpFp_mul(t, t, ih->precalc1_27);
     mpFp_sub(s, s, t);
-    mpFp_pow(t, s, ih->precalc_cubert);
+    mpFp_pow_mpz(t, s, ih->precalc_cubert);
     mpFp_mul(s, u, u);
     mpFp_mul(s, s, ih->precalc1_3);
     mpFp_add(t, t, s);
@@ -156,12 +160,8 @@ static void _icartHash_deterministic_map(mpECP_t hx, icartHash_t ih, mpz_t x) {
 // (when added to deterministic mapping, result is uniform)
 
 static void _icartHash_uniform_map(mpECP_t hx, icartHash_t ih, mpz_t x) {
-    mpFp_t fx;
-    mpFp_init(fx);
     // uniform map is simply scalar multiplication
-    mpFp_set_mpz(fx, x, ih->cv->n);
-    mpECP_scalar_base_mul(hx, ih->pt, fx);
-    mpFp_clear(fx);
+    mpECP_scalar_base_mul_mpz(hx, ih->pt, x);
     return;
 }
 
@@ -170,8 +170,8 @@ void icartHash_hashval(mpECP_t hash, icartHash_t ih, mpz_t x) {
     mpECP_t pa, pb;
     mpz_init(ha);
     mpz_init(hb);
-    mpECP_init(pa);
-    mpECP_init(pb);
+    mpECP_init(pa, ih->cv);
+    mpECP_init(pb, ih->cv);
     // composition of functions: H = D(Ha(x)) + U(Hb(x))
     // Ha, Hb independent {0,1}N -> Fp mappings
     // D, U are Fp -> E(Fp) mappings
@@ -193,8 +193,8 @@ void icartHash_hashval(mpECP_t hash, icartHash_t ih, mpz_t x) {
     }
 #endif
     mpECP_add(hash, pa, pb);
-    mpECP_init(pb);
-    mpECP_init(pa);
+    mpECP_clear(pb);
+    mpECP_clear(pa);
     mpz_clear(hb);
     mpz_clear(ha);
     return;
