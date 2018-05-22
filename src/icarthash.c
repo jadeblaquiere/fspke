@@ -40,7 +40,7 @@ void icartHash_init(icartHash_t ih, mpECurve_t cv) {
     mpECurve_set(ih->cv, cv);
     cwHash_init(ih->cwa, cv->n);
     cwHash_init(ih->cwb, cv->n);
-    mpECP_init(ih->pt, cv);
+    mpECP_init(ih->pt, ih->cv);
     mpFp_init_fp(ih->precalc1_3, cv->fp);
     mpFp_init_fp(ih->precalc1_27, cv->fp);
     mpz_init(ih->precalc_cubert);

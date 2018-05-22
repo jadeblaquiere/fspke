@@ -33,6 +33,7 @@
 #include <ecurve.h>
 #include <portable_endian.h>
 #include <icarthash.h>
+#include <inttypes.h>
 #include <libtasn1.h>
 #include <sparsetree.h>
 #include <stdbool.h>
@@ -353,12 +354,13 @@ void CHKPKE_clear(CHKPKE_t chk) {
 extern const asn1_static_node fspke_asn1_tab[];
 
 static int _asn1_write_mpz_as_octet_string(asn1_node root, char *attribute, mpz_t value) {
-    int length;
+    size_t length;
     int result;
     size_t lwrote;
     char *buffer;
 
-    length = (mpz_sizeinbase(value, 2) + 7) / 8;
+    length = (mpz_sizeinbase(value, 2) + 7) >> 3;
+    //printf("trying to alloc %ld bytes\n", length + 1);
     buffer = (char *)malloc((length+1)*sizeof(char));
     assert(buffer != NULL);
     mpz_export(buffer, &lwrote, 1, sizeof(char), 0, 0, value);
@@ -404,7 +406,7 @@ static int _asn1_write_int64_as_integer(asn1_node root, char *attribute, int64_t
     }
     buffer = (char *)malloc((nbytes + 2) * sizeof(char));
     assert(buffer != NULL);
-    sprintf(buffer,"%ld", value);
+    sprintf(buffer,"%" PRId64, value);
     //printf("writing %ld (%s), length %d to %s\n", value, buffer, nbytes, attribute);
     result = asn1_write_value(root, attribute, buffer, 0);
     //printf("returned %d\n", result);
@@ -552,14 +554,23 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
         element_clear(gH);
     }
 
-    // Carter-Wegman hash function A
-    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.p", chk->H->cwa->p);
-    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.a", chk->H->cwa->a->i);
-    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.b", chk->H->cwa->b->i);
-    // Carter-Wegman hash function A
-    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.p", chk->H->cwb->p);
-    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.a", chk->H->cwb->a->i);
-    sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.b", chk->H->cwb->b->i);
+    {
+        mpz_t tmpz;
+        mpz_init(tmpz);
+        // Carter-Wegman hash function A
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.p", chk->H->cwa->p);
+        mpz_set_mpFp(tmpz, chk->H->cwa->a);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.a", tmpz);
+        mpz_set_mpFp(tmpz, chk->H->cwa->b);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwa.b", tmpz);
+        // Carter-Wegman hash function A
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.p", chk->H->cwb->p);
+        mpz_set_mpFp(tmpz, chk->H->cwb->a);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.a", tmpz);
+        mpz_set_mpFp(tmpz, chk->H->cwb->b);
+        sum += _asn1_write_mpz_as_octet_string(pubkey_asn1, "h.cwb.b", tmpz);
+        mpz_clear(tmpz);
+    }
 
     // validate export
     sum += 256;  // pad for DER header + some extra just in case
@@ -1053,15 +1064,24 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
         element_clear(gH);
     }
 
-    // Carter-Wegman hash function A
-    sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.p", chk->H->cwa->p);
-    sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.a", chk->H->cwa->a->i);
-    sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.b", chk->H->cwa->b->i);
-    // Carter-Wegman hash function A
-    sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwb.p", chk->H->cwb->p);
-    sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwb.a", chk->H->cwb->a->i);
-    sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwb.b", chk->H->cwb->b->i);
-    
+    {
+        mpz_t tmpz;
+        mpz_init(tmpz);
+        // Carter-Wegman hash function A
+        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.p", chk->H->cwa->p);
+        mpz_set_mpFp(tmpz, chk->H->cwa->a);
+        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.a", tmpz);
+        mpz_set_mpFp(tmpz, chk->H->cwa->b);
+        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwa.b", tmpz);
+        // Carter-Wegman hash function A
+        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwb.p", chk->H->cwb->p);
+        mpz_set_mpFp(tmpz, chk->H->cwb->a);
+        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwb.a", tmpz);
+        mpz_set_mpFp(tmpz, chk->H->cwb->b);
+        sum += _asn1_write_mpz_as_octet_string(privkey_asn1, "pubkey.h.cwb.b", tmpz);
+        mpz_clear(tmpz);
+    }
+
     //printf("privkey export : pubkey complete\n");
 
     {
@@ -1520,8 +1540,11 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
         }
         //gmp_printf("g.y parsed as : %Zd (0x%Zx)\n", y, y);
 
-        mpECurve_set_mpz_ws(hcv, chk->q, chk->C->coeff.ws.a->i,
-            chk->C->coeff.ws.b->i, chk->r, chk->h, x, y, qbits);
+        {
+            mpz_set_mpFp(a, chk->C->coeff.ws.a);
+            mpz_set_mpFp(b, chk->C->coeff.ws.b);
+            mpECurve_set_mpz_ws(hcv, chk->q, a, b, chk->r, chk->h, x, y, qbits);
+        }
 
         mpz_clear(y);
         mpz_clear(x);
@@ -1550,8 +1573,8 @@ int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     cwHash_set_mpz(cwb, chk->r, p, a, b);
 
     assert(mpECurve_cmp(hcv, chk->C) == 0);
-    icartHash_init(chk->H, hcv);
-    icartHash_set_param(chk->H, hcv, cwa, cwb);
+    icartHash_init(chk->H, chk->C);
+    icartHash_set_param(chk->H, chk->C, cwa, cwb);
     sparseTree_init(chk->tree, chk->order, _init_chk_node);
     element_init_G1(e_pt, chk->pairing);
     _CHKPKE_precalc_H0(e_pt, chk);
@@ -1735,8 +1758,11 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
         }
         //gmp_printf("g.y parsed as : %Zd (0x%Zx)\n", y, y);
 
-        mpECurve_set_mpz_ws(hcv, chk->q, chk->C->coeff.ws.a->i,
-            chk->C->coeff.ws.b->i, chk->r, chk->h, x, y, qbits);
+        {
+            mpz_set_mpFp(a, chk->C->coeff.ws.a);
+            mpz_set_mpFp(b, chk->C->coeff.ws.b);
+            mpECurve_set_mpz_ws(hcv, chk->q, a, b, chk->r, chk->h, x, y, qbits);
+        }
 
         mpz_clear(y);
         mpz_clear(x);
@@ -1764,8 +1790,9 @@ int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
     //gmp_printf("cwb.b parsed as : %Zd (0x%Zx)\n", b, b);
     cwHash_set_mpz(cwb, chk->r, p, a, b);
 
-    icartHash_init(chk->H, hcv);
-    icartHash_set_param(chk->H, hcv, cwa, cwb);
+    assert(mpECurve_cmp(chk->C, hcv) == 0);
+    icartHash_init(chk->H, chk->C);
+    icartHash_set_param(chk->H, chk->C, cwa, cwb);
     sparseTree_init(chk->tree, chk->order, _init_chk_node);
     element_init_G1(e_pt, chk->pairing);
     _CHKPKE_precalc_H0(e_pt, chk);

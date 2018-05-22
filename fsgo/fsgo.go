@@ -151,7 +151,9 @@ func (z *CHKPKE) ExportDelegatePrivkey(start, end int64) (key []byte, err error)
 func CHKPKEImportPubkey(key []byte) (z *CHKPKE, err error) {
 	z = new(CHKPKE)
 	z.pke = C.malloc_CHKPKE()
-	r := C.CHKPKE_init_pubkey_decode_DER(z.pke, C.unsafeptr_to_charptr(C.CBytes(key)), C.int(len(key)))
+	ckey := C.CBytes(key)
+	r := C.CHKPKE_init_pubkey_decode_DER(z.pke, C.unsafeptr_to_charptr(ckey), C.int(len(key)))
+	defer C.free(ckey)
 	if r != C.int(0) {
 		C.free_CHKPKE(z.pke)
 		return nil, errors.New("ImportPubkey: decode DER failed")
@@ -163,7 +165,9 @@ func CHKPKEImportPubkey(key []byte) (z *CHKPKE, err error) {
 func CHKPKEImportPrivkey(key []byte) (z *CHKPKE, err error) {
 	z = new(CHKPKE)
 	z.pke = C.malloc_CHKPKE()
-	r := C.CHKPKE_init_privkey_decode_DER(z.pke, C.unsafeptr_to_charptr(C.CBytes(key)), C.int(len(key)))
+	ckey := C.CBytes(key)
+	r := C.CHKPKE_init_privkey_decode_DER(z.pke, C.unsafeptr_to_charptr(ckey), C.int(len(key)))
+	defer C.free(ckey)
 	if r != C.int(0) {
 		C.free_CHKPKE(z.pke)
 		return nil, errors.New("ImportPubkey: decode DER failed")
@@ -181,6 +185,7 @@ func (z *CHKPKE) GenerateRandomElement() (e *Element) {
 	e = new(Element)
 	e.ele = C.malloc_Element()
 	C.CHKPKE_init_random_element(e.ele, z.pke)
+	e.gpke = z
 	runtime.SetFinalizer(e, element_clear)
 	return e
 }
