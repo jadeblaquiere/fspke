@@ -30,7 +30,7 @@
 
 #include <assert.h>
 #include <check.h>
-#include <chkpke.h>
+#include <fspke/chkpke.h>
 #include <gmp.h>
 #include <stdio.h>
 #include <stdlib.h>

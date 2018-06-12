@@ -36,7 +36,7 @@ module1 = Extension('FSPKE',
                     'include'],
     libraries = ['fspke', 'ecc', 'pbc', 'gmp', 'tasn1'],
     library_dirs = ['src/.libs'],
-    sources = ['python/fspke.c'])
+    sources = ['python/pyfspke.c'])
 
 setup (name = 'FSPKE',
     version = '1.0',

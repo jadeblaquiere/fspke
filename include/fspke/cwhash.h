@@ -28,51 +28,46 @@
 //OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef _SPARSETREE_H_INCLUDED_
-#define _SPARSETREE_H_INCLUDED_
+#ifndef _CWHASH_H_INCLUDED_
+#define _CWHASH_H_INCLUDED_
 
-#include <field.h>
+#include <ecc.h>
 #include <gmp.h>
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// sparseTree implements an Order N B-Tree with lazy allocation where
-// all non-leaf nodes have exactly N children. Nodes are created when first
-// referenced. Supports arbitrary depth. The init parameter provides a
-// callback function which is called for each allocated node to initialize
-// local data at the node. In this way SimpleNTree can be used to manage a
-// tree of data without creating a derived class. Application-specific data
-// can be attached to nodeData and the clear function will be called as part
-// of the cleanup process so any dynamially allocated data referenced by
-// nodeData should be free'd by the clear callback
+// cwHash implements the Carter and Wegman universal hash function family
+// to map (hash) an integer value of arbitrary size to a member of the
+// the integers less than q : {0,1}N -> {0, 1, ... , q-2, q-1}.
+// p must be a prime and for the distribution to be uniform p is much greater
+// than q : p >> q.
+// 
+// see: https://en.wikipedia.org/wiki/Universal_hashing
 
-typedef struct _sparseTree_t {
-    int n;
-    int depth;
-    uint64_t ordinal;
-    uint64_t id;
-    struct _sparseTree_t *parent;
-    struct _sparseTree_t **child;
-    void (*init)(struct _sparseTree_t *);
-    void (*clear)(struct _sparseTree_t *);
-    void *nodeData;
-} _sparseTree_t;
+typedef struct {
+    mpz_t p;
+    mpz_t q;
+    mpFp_t a;
+    mpFp_t b;
+} _cwHash_t;
 
-typedef _sparseTree_t sparseTree_t[1];
-typedef _sparseTree_t *sparseTree_ptr_t;
+typedef _cwHash_t cwHash_t[1];
 
-void sparseTree_init(sparseTree_t node, int n, void (*init)(_sparseTree_t *));
-void sparseTree_clear(sparseTree_t node);
+void cwHash_init(cwHash_t cwh, mpz_t p);
+void cwHash_clear(cwHash_t cwh);
 
-_sparseTree_t *sparseTree_find_by_address(sparseTree_t node, int depth, uint64_t ordinal);
+void cwHash_set(cwHash_t rcwh, cwHash_t cwh);
 
-uint64_t sparseTree_node_id(sparseTree_t node);
+void cwHash_set_mpz(cwHash_t cwh, mpz_t q, mpz_t p, mpz_t a, mpz_t b);
+
+void cwHash_urandom(cwHash_t cwh, mpz_t q);
+
+void cwHash_hashval(mpz_t hash, cwHash_t cwh, mpz_t x);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _SPARSETREE_H_INCLUDED_
+#endif // _CWHASH_H_INCLUDED_

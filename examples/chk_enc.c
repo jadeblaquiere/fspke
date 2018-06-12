@@ -31,7 +31,7 @@
 #include <assert.h>
 #include <b64file.h>
 #include <check.h>
-#include <chkpke.h>
+#include <fspke.h>
 #include <libtasn1.h>
 #include <limits.h>
 #include <popt.h>

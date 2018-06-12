@@ -30,7 +30,7 @@
 
 #include <assert.h>
 #include <check.h>
-#include <sparsetree.h>
+#include <fspke/sparsetree.h>
 #include <stdio.h>
 #include <stdlib.h>
 

@@ -29,7 +29,7 @@
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <assert.h>
-#include <sparsetree.h>
+#include <fspke/sparsetree.h>
 #include <stdint.h>
 //#include <stdio.h>
 #include <stdlib.h>

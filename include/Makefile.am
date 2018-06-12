@@ -1,1 +1,1 @@
-include_HEADERS = chkpke.h cwhash.h icarthash.h sparsetree.h
+nobase_include_HEADERS = fspke.h fspke/chkpke.h fspke/cwhash.h fspke/icarthash.h fspke/sparsetree.h

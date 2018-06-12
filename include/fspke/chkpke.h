@@ -31,12 +31,11 @@
 #ifndef _CHKPKE_H_INCLUDED_
 #define _CHKPKE_H_INCLUDED_
 
-#include <ecurve.h>
-#include <field.h>
+#include <ecc.h>
+#include <fspke/icarthash.h>
+#include <fspke/sparsetree.h>
 #include <gmp.h>
-#include <icarthash.h>
 #include <pbc.h>
-#include <sparsetree.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus

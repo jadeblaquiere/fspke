@@ -29,10 +29,10 @@
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <assert.h>
-#include <cwhash.h>
-#include <field.h>
+#include <ecc.h>
+#include <fspke/cwhash.h>
+#include <fspke/icarthash.h>
 #include <gmp.h>
-#include <icarthash.h>
 #include <stdlib.h>
 
 void icartHash_init(icartHash_t ih, mpECurve_t cv) {

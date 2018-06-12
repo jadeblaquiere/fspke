@@ -29,13 +29,13 @@
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <assert.h>
-#include <chkpke.h>
-#include <ecurve.h>
-#include <portable_endian.h>
-#include <icarthash.h>
+#include <ecc.h>
+#include <fspke/chkpke.h>
+#include <fspke/icarthash.h>
+#include <fspke/sparsetree.h>
 #include <inttypes.h>
 #include <libtasn1.h>
-#include <sparsetree.h>
+#include <portable_endian.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>

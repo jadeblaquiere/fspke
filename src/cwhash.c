@@ -29,10 +29,9 @@
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <assert.h>
-#include <cwhash.h>
-#include <field.h>
+#include <ecc.h>
+#include <fspke/cwhash.h>
 #include <gmp.h>
-#include <mpzurandom.h>
 #include <stdlib.h>
 
 // primality test will accept a composite with probability 4**(-reps)

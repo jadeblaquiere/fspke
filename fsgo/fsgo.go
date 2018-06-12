@@ -32,7 +32,7 @@ package fsgo
 
 // #cgo CFLAGS: -I/usr/local/include/pbc -I/usr/include/pbc
 // #cgo LDFLAGS: -lfspke
-// #include <chkpke.h>
+// #include <fspke/chkpke.h>
 // #include <pbc.h>
 // #include <stdlib.h>
 //

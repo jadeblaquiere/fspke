@@ -29,13 +29,11 @@
 //OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <assert.h>
-#include <cwhash.h>
-#include <ecurve.h>
-#include <field.h>
+#include <ecc.h>
+#include <fspke/cwhash.h>
+#include <fspke/icarthash.h>
 #include <gmp.h>
-#include <icarthash.h>
 #include <math.h>
-#include <mpzurandom.h>
 #include <check.h>
 #include <stdio.h>
 #include <stdlib.h>

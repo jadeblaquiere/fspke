@@ -31,8 +31,8 @@
 #ifndef _ICARTHASH_H_INCLUDED_
 #define _ICARTHASH_H_INCLUDED_
 
-#include <cwhash.h>
-#include <ecpoint.h>
+#include <ecc.h>
+#include <fspke/cwhash.h>
 #include <gmp.h>
 
 #ifdef __cplusplus
