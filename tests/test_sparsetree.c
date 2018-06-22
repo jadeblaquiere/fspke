@@ -163,6 +163,10 @@ int main(void)
     Suite *s;
     SRunner *sr;
 
+#ifdef SAFE_CLEAN
+    _enable_gmp_safe_clean();
+#endif
+
     s = sparseTree_test_suite();
     sr = srunner_create(s);
 

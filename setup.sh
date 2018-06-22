@@ -14,7 +14,7 @@ cd ..
 git clone https://github.com/blynn/pbc.git
 cd pbc
 autoreconf --install
-./configure --prefix=/usr
+./configure --prefix=/usr --enable-safe-clean
 make
 sudo make install
 cd ..

@@ -33,6 +33,7 @@
 #include <fspke/cwhash.h>
 #include <gmp.h>
 #include <stdlib.h>
+#include <string.h>
 
 // primality test will accept a composite with probability 4**(-reps)
 #define _MILLER_RABIN_REPS    (40)
@@ -51,6 +52,9 @@ void cwHash_clear(cwHash_t cwh) {
     mpz_clear(cwh->q);
     mpFp_clear(cwh->a);
     mpFp_clear(cwh->b);
+#ifdef  SAFE_CLEAN
+    memset((void *)(cwh), 0, sizeof(*cwh));
+#endif
     return;
 }
 

@@ -31,8 +31,9 @@
 package fsgo
 
 // #cgo CFLAGS: -I/usr/local/include/pbc -I/usr/include/pbc
-// #cgo LDFLAGS: -lfspke
+// #cgo LDFLAGS: -lfspke -lecc
 // #include <fspke/chkpke.h>
+// #include <ecc/safememory.h>
 // #include <pbc.h>
 // #include <stdlib.h>
 //
@@ -88,6 +89,10 @@ type CHKPKE struct {
 type Element struct {
 	ele  C.element_ptr
 	gpke *CHKPKE
+}
+
+func init() {
+	C._enable_gmp_safe_clean()
 }
 
 func CHKPKEGen(qbits, rbits, depth, order int) (z *CHKPKE) {

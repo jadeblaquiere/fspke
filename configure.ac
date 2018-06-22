@@ -10,8 +10,16 @@ AC_ARG_ENABLE([examples],
   yes) examples=true ;;
   no)  examples=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-examples]) ;;
-esac],[debug=false])
+esac],[examples=false])
+AC_ARG_ENABLE([safe-clean],
+[  --enable-safe-clean       zero memory before releasing with free @<:@default=yes@:>@],
+[case "${enableval}" in
+  yes) safeclean=true ;;
+  no)  safeclean=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-safe-clean]) ;;
+esac],[safeclean=true])
 AM_CONDITIONAL([COND_EXAMPLES], [test "x$examples" = xtrue])
+AM_CONDITIONAL([COND_SAFECLEAN], [test "x$safeclean" = xtrue])
 AC_CHECK_LIB(gmp, __gmpz_init)
 AC_CHECK_LIB(ecc, mpFp_init)
 AC_CHECK_LIB(pbc, element_printf)

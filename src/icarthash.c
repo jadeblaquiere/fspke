@@ -34,6 +34,7 @@
 #include <fspke/icarthash.h>
 #include <gmp.h>
 #include <stdlib.h>
+#include <string.h>
 
 void icartHash_init(icartHash_t ih, mpECurve_t cv) {
     mpECurve_init(ih->cv);
@@ -55,6 +56,9 @@ void icartHash_clear(icartHash_t ih) {
     mpFp_clear(ih->precalc1_3);
     mpFp_clear(ih->precalc1_27);
     mpz_clear(ih->precalc_cubert);
+#ifdef  SAFE_CLEAN
+    memset((void *)(ih), 0, sizeof(*ih));
+#endif
     return;
 }
 

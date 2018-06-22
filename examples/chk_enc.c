@@ -78,6 +78,8 @@ int main(int argc, char **argv) {
     unsigned char shared_hash[crypto_aead_chacha20poly1305_ietf_KEYBYTES];
     unsigned char nonce[crypto_aead_chacha20poly1305_ietf_NPUBBYTES];
 
+    // attach gmp realloc/free functions to clear memory before free
+    _enable_gmp_safe_clean();
 
     // pc is the context for all popt-related functions
     pc = poptGetContext(NULL, argc, (const char **)argv, po, 0);

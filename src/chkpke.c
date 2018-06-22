@@ -349,6 +349,9 @@ void CHKPKE_clear(CHKPKE_t chk) {
     mpz_clear(chk->q);
     mpz_clear(chk->r);
     mpz_clear(chk->h);
+#ifdef  SAFE_CLEAN
+    memset((void *)chk,0,sizeof(*chk));
+#endif
 }
 
 extern const asn1_static_node fspke_asn1_tab[];

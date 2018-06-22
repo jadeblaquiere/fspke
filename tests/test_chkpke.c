@@ -293,13 +293,13 @@ START_TEST(test_chkpke_export_privkey_der)
     assert(i == 0);
     der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, interval, &sz2);
     assert(der2 != NULL);
-    //printf("DER encoded privkey (%d bytes)=\n", sz2);
+    printf("DER encoded privkey (%d bytes)=\n", sz2);
     assert(sz1 == sz2);
     for (i = 0; i < sz2; i++) {
-        //printf("%02X", der2[i]);
+        printf("%02X", der2[i]);
         assert(der1[i] == der2[i]);
     }
-    //printf("\n");
+    printf("\n");
 
     // validate that can't derive key for previous interval
     der3 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, interval - 1, &sz3);
@@ -322,6 +322,10 @@ START_TEST(test_chkpke_export_privkey_der)
     assert(sz1 == sz4);
     for (i = 0; i < sz4; i++) {
         //printf("%02X", der4[i]);
+        if (der1[i] != der4[i]) {
+            printf("der1, der4 differ on byte %d\n", i);
+            printf("   expected 0x%X, got 0x%X\n", der1[i], der4[i]);
+        }
         assert(der1[i] == der4[i]);
     }
     //printf("\n");
@@ -581,6 +585,10 @@ int main(void)
     int number_failed;
     Suite *s;
     SRunner *sr;
+
+#ifdef SAFE_CLEAN
+    _enable_gmp_safe_clean();
+#endif
 
     s = CHKPKE_test_suite();
     sr = srunner_create(s);

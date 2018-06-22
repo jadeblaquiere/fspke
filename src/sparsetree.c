@@ -33,6 +33,7 @@
 #include <stdint.h>
 //#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // recursive algorithm to sum the number of nodes in previous rows
 // finite sequence is 1 + n + n**2 + .. n**k
@@ -111,10 +112,16 @@ void sparseTree_clear(sparseTree_t node) {
         node->child[i] = NULL;
     }
     if (node->clear != NULL) node->clear(node);
+#ifdef  SAFE_CLEAN
+    memset((void *)(node->child), 0, sizeof(*(node->child)));
+#endif
     free(node->child);
     node->init = NULL;
     node->clear = NULL;
     node->nodeData = NULL;
+#ifdef  SAFE_CLEAN
+    memset((void *)(node), 0, sizeof(*node));
+#endif
     return;
 }
 

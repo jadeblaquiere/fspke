@@ -500,6 +500,9 @@ PyInit_FSPKE(void)
 {
 	PyObject* m;
 
+    // attach gmp realloc/free functions to clear memory before free
+    _enable_gmp_safe_clean();
+
 	if (PyType_Ready(&CHKPKEType) < 0)
 		return NULL;
 

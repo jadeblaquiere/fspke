@@ -65,6 +65,9 @@ int main(int argc, char **argv) {
     int sz;
     int result;
 
+    // attach gmp realloc/free functions to clear memory before free
+    _enable_gmp_safe_clean();
+
     // pc is the context for all popt-related functions
     pc = poptGetContext(NULL, argc, (const char **)argv, po, 0);
     //poptSetOtherOptionHelp(pc, "[ARG...]");
