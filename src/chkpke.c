@@ -2235,6 +2235,60 @@ error_cleanup1:
     return -1;
 }
 
+static int64_t _leftmost_active_CHK_node(sparseTree_t node, int depth) {
+    int i;
+
+    if (node->nodeData != NULL) {
+        _chkpke_node_data_t *nd;
+        nd = (_chkpke_node_data_t *)node->nodeData;
+        if ((nd->S != NULL) && (nd->nR == node->depth)) {
+            return node->ordinal * _expi64(node->n, depth);
+        }
+    }
+    if (depth == 0) {
+        return -1;
+    }
+    for (i = 0 ; i < node->n; i++) {
+        if (node->child[i] != NULL) {
+            int64_t left;
+            left = _leftmost_active_CHK_node(node->child[i], depth - 1);
+            if (left != -1) return left;
+        }
+    }
+    return -1;
+}
+
+static int64_t _rightmost_active_CHK_node(sparseTree_t node, int depth) {
+    int i;
+
+    if (node->nodeData != NULL) {
+        _chkpke_node_data_t *nd;
+        nd = (_chkpke_node_data_t *)node->nodeData;
+        if ((nd->S != NULL) && (nd->nR == node->depth)) {
+            return ((node->ordinal + 1) * _expi64(node->n, depth)) - 1;
+        }
+    }
+    if (depth == 0) {
+        return -1;
+    }
+    for (i = (node->n - 1) ; i >= 0; i--) {
+        if (node->child[i] != NULL) {
+            int64_t right;
+            right = _rightmost_active_CHK_node(node->child[i], depth - 1);
+            if (right != -1) return right;
+        }
+    }
+    return -1;
+}
+
+int64_t CHKPKE_privkey_min_interval(CHKPKE_t chk) {
+    return _leftmost_active_CHK_node(chk->tree, chk->depth);
+}
+
+int64_t CHKPKE_privkey_max_interval(CHKPKE_t chk) {
+    return _rightmost_active_CHK_node(chk->tree, chk->depth);
+}
+
 unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz) {
     int len;
     unsigned char *e_bytes;

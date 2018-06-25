@@ -32,6 +32,7 @@
 #include <check.h>
 #include <fspke/chkpke.h>
 #include <gmp.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -279,6 +280,8 @@ START_TEST(test_chkpke_export_privkey_der)
 
     //printf("generating key\n");
     CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
+    assert (CHKPKE_privkey_min_interval(pke1) == 0);
+    assert (CHKPKE_privkey_max_interval(pke1) == (1<<(6*4)) - 1);
 
     //printf("exporting key\n");
     der1 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval, &sz1);
@@ -291,6 +294,8 @@ START_TEST(test_chkpke_export_privkey_der)
 
     i = CHKPKE_init_privkey_decode_DER(pke2, (char *)der1, sz1);
     assert(i == 0);
+    assert (CHKPKE_privkey_min_interval(pke2) == interval);
+    assert (CHKPKE_privkey_max_interval(pke2) == (1<<(6*4)) - 1);
     der2 = (unsigned char *)CHKPKE_privkey_encode_DER(pke2, interval, &sz2);
     assert(der2 != NULL);
     printf("DER encoded privkey (%d bytes)=\n", sz2);
@@ -315,6 +320,8 @@ START_TEST(test_chkpke_export_privkey_der)
     printf("\n");
 
     i = CHKPKE_init_privkey_decode_DER(pke3, (char *)der3, sz3);
+    assert (CHKPKE_privkey_min_interval(pke3) == (interval - 1));
+    assert (CHKPKE_privkey_max_interval(pke3) == (1<<(6*4)) - 1);
     assert(i == 0);
     der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke3, interval, &sz4);
     assert(der4 != NULL);
@@ -348,6 +355,8 @@ START_TEST(test_chkpke_export_privkey_der)
     // Update pke1 for current interval
     i = CHKPKE_Upd(pke1, interval);
     assert(i == 0);
+    assert (CHKPKE_privkey_min_interval(pke1) == interval);
+    assert (CHKPKE_privkey_max_interval(pke1) == (1<<(6*4)) - 1);
     // validate that can't derive key for previous interval
     der4 = (unsigned char *)CHKPKE_privkey_encode_DER(pke1, interval - 1, &sz4);
     assert(der4 == NULL);
@@ -378,6 +387,8 @@ START_TEST(test_chkpke_export_import_privkey_delegate)
 
     //printf("generating key\n");
     CHKPKE_init_Gen(pke1, 512, 400, 6, 16);
+    assert (CHKPKE_privkey_min_interval(pke1) == 0);
+    assert (CHKPKE_privkey_max_interval(pke1) == (1<<(6*4)) - 1);
 
     //printf("exporting key\n");
     der1 = (unsigned char *)CHKPKE_privkey_encode_delegate_DER(pke1, 1, (1<<(6*4-1)) - 2, &sz1);
@@ -397,6 +408,8 @@ START_TEST(test_chkpke_export_import_privkey_delegate)
     assert(mpz_cmp(pke1->h, pke2->h) == 0);
     assert(element_cmp(pke1->P, pke2->P) == 0);
     assert(element_cmp(pke1->Q, pke2->Q) == 0);
+    assert (CHKPKE_privkey_min_interval(pke2) == 1);
+    assert (CHKPKE_privkey_max_interval(pke2) == (1<<(6*4-1)) - 2);
 
     // validate that the new keyset cannot derive secrets for begin - 1, end + 1
     // but can derive secrets for begin and end

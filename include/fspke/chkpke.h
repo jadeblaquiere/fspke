@@ -143,6 +143,13 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz);
 int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz,
         int64_t interval);
 
+
+// find the minimum and maximum interval for which the key can derive
+// secrets. The algorithm finds these values by finding the leftmost and
+// rightmost valid elements in the key btree.
+int64_t CHKPKE_privkey_min_interval(CHKPKE_t chk);
+int64_t CHKPKE_privkey_max_interval(CHKPKE_t chk);
+
 // convenience wrappers for handling Fp2 elements, so you don't have to
 // interact directly with pbc library if you don't want to. You can simply
 // create a random element, convert it to bytes (and hash, please) to use
