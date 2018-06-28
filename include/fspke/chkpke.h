@@ -103,16 +103,16 @@ void CHKPKE_init_Gen(CHKPKE_t chk, int qbits, int rbits, int depth, int order);
 // to represent the structured key as an string of bytes.
 // encode_DER allocates and returns a char type string - the caller must
 // use free() to release that memory once no longer in use.
-char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz);
-char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz);
+unsigned char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, size_t *sz);
+unsigned char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, size_t *sz);
 
 // A delegate key is limited to a specific set of intervals (i.e. it has an end
 // interval which may be less than the full life of the original key)
-char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t end, int *sz);
+unsigned char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t end, size_t *sz);
 
 // decode routines return non-zero on decode error
-int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz);
-int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz);
+int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, unsigned char *der, size_t sz);
+int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, unsigned char *der, size_t sz);
 
 // Der attempts to derive the key material for a specific interval and returns
 // -1 on failure (which will occur when attempting to derive a key for a past
@@ -134,13 +134,13 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval);
 // memory once no longer in use. The message is encoded for a particular
 // interval. Once a private key is updated to a future interval the resulting
 // message cannot be decrypted.
-char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz);
+unsigned char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, size_t *sz);
 
 // Dec_DER decodes an ASN1 DER encoded ciphertext into the original plaintext
 // element based on the private key material and the specific interval. Dec
 // returns 0 on success and -1 on error, e.g. if the key cannot be derived for
 // the specified interval.
-int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz,
+int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, unsigned char *cipher, size_t sz,
         int64_t interval);
 
 
@@ -157,8 +157,8 @@ int64_t CHKPKE_privkey_max_interval(CHKPKE_t chk);
 // the bytes back into the element. NOTE: init_element_from_bytes presumes
 // it is being passed an unitialized element. If the element was previously
 // initialized it should be cleared with CHKPKE_element_clear first. 
-unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz);
-int CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz);
+unsigned char *CHKPKE_element_to_bytes(element_t e, size_t *sz);
+int CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, size_t sz);
 void CHKPKE_init_element(element_t e, CHKPKE_t chk);
 void CHKPKE_init_random_element(element_t e, CHKPKE_t chk);
 void CHKPKE_element_clear(element_t e);

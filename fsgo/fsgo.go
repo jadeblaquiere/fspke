@@ -53,8 +53,8 @@ package fsgo
 //     free(e);
 // }
 //
-// char *unsafeptr_to_charptr(void *in) {
-//     return (char *)in;
+// unsigned char *unsafeptr_to_ucharptr(void *in) {
+//     return (unsigned char *)in;
 // }
 //
 // int range_cmp_interval(_CHKPKE_t *pke, int64_t interval) {
@@ -110,8 +110,8 @@ func chkpke_clear(z *CHKPKE) {
 
 func (z *CHKPKE) ExportPubkey() (key []byte, err error) {
 	//var pke *C._CHKPKE_t
-	var der *C.char
-	l := C.int(0)
+	var der *C.uchar
+	l := C.size_t(0)
 
 	der, _ = C.CHKPKE_pubkey_encode_DER(z.pke, &l)
 	if der == nil {
@@ -119,13 +119,13 @@ func (z *CHKPKE) ExportPubkey() (key []byte, err error) {
 	}
 
 	defer C.free(unsafe.Pointer(der))
-	return C.GoBytes(unsafe.Pointer(der), l), nil
+	return C.GoBytes(unsafe.Pointer(der), C.int(l)), nil
 }
 
 func (z *CHKPKE) ExportPrivkey(start int64) (key []byte, err error) {
 	//var pke *C._CHKPKE_t
-	var der *C.char
-	l := C.int(0)
+	var der *C.uchar
+	l := C.size_t(0)
 	st := C.int64_t(start)
 
 	der = C.CHKPKE_privkey_encode_DER(z.pke, st, &l)
@@ -134,13 +134,13 @@ func (z *CHKPKE) ExportPrivkey(start int64) (key []byte, err error) {
 	}
 
 	defer C.free(unsafe.Pointer(der))
-	return C.GoBytes(unsafe.Pointer(der), l), nil
+	return C.GoBytes(unsafe.Pointer(der), C.int(l)), nil
 }
 
 func (z *CHKPKE) ExportDelegatePrivkey(start, end int64) (key []byte, err error) {
 	//var pke *C._CHKPKE_t
-	var der *C.char
-	l := C.int(0)
+	var der *C.uchar
+	l := C.size_t(0)
 	st := C.int64_t(start)
 	en := C.int64_t(end)
 
@@ -150,14 +150,14 @@ func (z *CHKPKE) ExportDelegatePrivkey(start, end int64) (key []byte, err error)
 	}
 
 	defer C.free(unsafe.Pointer(der))
-	return C.GoBytes(unsafe.Pointer(der), l), nil
+	return C.GoBytes(unsafe.Pointer(der), C.int(l)), nil
 }
 
 func CHKPKEImportPubkey(key []byte) (z *CHKPKE, err error) {
 	z = new(CHKPKE)
 	z.pke = C.malloc_CHKPKE()
 	ckey := C.CBytes(key)
-	r := C.CHKPKE_init_pubkey_decode_DER(z.pke, C.unsafeptr_to_charptr(ckey), C.int(len(key)))
+	r := C.CHKPKE_init_pubkey_decode_DER(z.pke, C.unsafeptr_to_ucharptr(ckey), C.size_t(len(key)))
 	defer C.free(ckey)
 	if r != C.int(0) {
 		C.free_CHKPKE(z.pke)
@@ -171,7 +171,7 @@ func CHKPKEImportPrivkey(key []byte) (z *CHKPKE, err error) {
 	z = new(CHKPKE)
 	z.pke = C.malloc_CHKPKE()
 	ckey := C.CBytes(key)
-	r := C.CHKPKE_init_privkey_decode_DER(z.pke, C.unsafeptr_to_charptr(ckey), C.int(len(key)))
+	r := C.CHKPKE_init_privkey_decode_DER(z.pke, C.unsafeptr_to_ucharptr(ckey), C.size_t(len(key)))
 	defer C.free(ckey)
 	if r != C.int(0) {
 		C.free_CHKPKE(z.pke)
@@ -197,17 +197,17 @@ func (z *CHKPKE) GenerateRandomElement() (e *Element) {
 
 func (e *Element) ToBytes() (b []byte) {
 	var c_b *C.uchar
-	l := C.int(0)
+	l := C.size_t(0)
 
 	c_b = C.CHKPKE_element_to_bytes(e.ele, &l)
 
 	defer C.free(unsafe.Pointer(c_b))
-	return C.GoBytes(unsafe.Pointer(c_b), l)
+	return C.GoBytes(unsafe.Pointer(c_b), C.int(l))
 }
 
 func (z *CHKPKE) Encrypt(e *Element, interval int64) (ct []byte, err error) {
-	var c_ct *C.char
-	l := C.int(0)
+	var c_ct *C.uchar
+	l := C.size_t(0)
 	c_interval := C.int64_t(interval)
 
 	if C.range_cmp_interval(z.pke, c_interval) != C.int(0) {
@@ -220,7 +220,7 @@ func (z *CHKPKE) Encrypt(e *Element, interval int64) (ct []byte, err error) {
 	}
 
 	defer C.free(unsafe.Pointer(c_ct))
-	return C.GoBytes(unsafe.Pointer(c_ct), l), nil
+	return C.GoBytes(unsafe.Pointer(c_ct), C.int(l)), nil
 }
 
 func (z *CHKPKE) Decrypt(ct []byte, interval int64) (e *Element, err error) {
@@ -228,8 +228,8 @@ func (z *CHKPKE) Decrypt(ct []byte, interval int64) (e *Element, err error) {
 	e.ele = C.malloc_Element()
 
 	C.CHKPKE_init_element(e.ele, z.pke)
-	status := C.CHKPKE_Dec_DER(e.ele, z.pke, C.unsafeptr_to_charptr(C.CBytes(ct)),
-		C.int(len(ct)), C.int64_t(interval))
+	status := C.CHKPKE_Dec_DER(e.ele, z.pke, C.unsafeptr_to_ucharptr(C.CBytes(ct)),
+		C.size_t(len(ct)), C.int64_t(interval))
 	if status != C.int(0) {
 		C.CHKPKE_element_clear(e.ele)
 		C.free_Element(e.ele)

@@ -61,8 +61,8 @@ int main(int argc, char **argv) {
         {NULL}
     };
     CHKPKE_t pke;
-    char *der;
-    int sz;
+    unsigned char *der;
+    size_t sz;
     int result;
 
     // attach gmp realloc/free functions to clear memory before free

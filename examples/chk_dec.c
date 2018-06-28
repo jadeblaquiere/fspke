@@ -101,8 +101,9 @@ int main(int argc, char **argv) {
         {NULL}
     };
     CHKPKE_t pke;
-    char *der;
-    int sz, result;
+    unsigned char *der;
+    size_t sz; 
+    int result;
     element_t shared_element;
     unsigned char shared_hash[crypto_aead_chacha20poly1305_ietf_KEYBYTES];
     unsigned char *kex_bytes, *ctext_bytes, *plain_bytes, *nonce_bytes;
@@ -204,7 +205,10 @@ int main(int argc, char **argv) {
         //printf("-----------------\n");
 
         // read DER into ASN1 structure
-        result = asn1_der_decoding(&message_asn1, der, sz, asnError);
+        {
+            int isz = (int)sz;
+            result = asn1_der_decoding(&message_asn1, der, isz, asnError);
+        }
         if (result != ASN1_SUCCESS) return -1;
 
         //printf("-----------------\n");
@@ -213,7 +217,12 @@ int main(int argc, char **argv) {
 
         // dump additional data in DER format
         kex_sz = sz;
-        result = asn1_der_coding(message_asn1, "ad", der, &sz, asnError);
+        {
+            int isz;
+            isz = (int)sz;
+            result = asn1_der_coding(message_asn1, "ad", der, &isz, asnError);
+            sz = isz;
+        }
         assert(result == 0);
         assert(sz < kex_sz);
 
@@ -231,7 +240,7 @@ int main(int argc, char **argv) {
     }
 
     CHKPKE_init_element(shared_element, pke);
-    result =  CHKPKE_Dec_DER(shared_element, pke, (char *)kex_bytes, kex_sz, interval);
+    result =  CHKPKE_Dec_DER(shared_element, pke, kex_bytes, kex_sz, interval);
     if (result != 0) {
         fprintf(stderr, "<Error>: Error deriving shared key for interval\n");
         exit(1);
@@ -239,7 +248,7 @@ int main(int argc, char **argv) {
 
     // hash shared key to get a 256-bit key for encryption w/XChaCha
     {
-        int len = 0;
+        size_t len = 0;
         unsigned char *e_bytes;
         e_bytes = CHKPKE_element_to_bytes(shared_element, &len);
 

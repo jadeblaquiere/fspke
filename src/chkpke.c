@@ -475,7 +475,7 @@ static int _asn1_write_element_t_as_CurvePoint(asn1_node root, char *attribute, 
     return sum + 5;
 }
 
-char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
+unsigned char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, size_t *sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE pubkey_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -483,7 +483,7 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
     int length;
     int sum;
     //size_t lwrote;
-    char *buffer;
+    unsigned char *buffer;
 
     sum = 0;
 
@@ -578,7 +578,7 @@ char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, int *sz) {
     // validate export
     sum += 256;  // pad for DER header + some extra just in case
     length = sum;
-    buffer = (char *)malloc((sum) * sizeof(char));
+    buffer = (unsigned char *)malloc((sum) * sizeof(char));
     assert(buffer != NULL);
     result = asn1_der_coding(pubkey_asn1, "", buffer, &length, asnError);
     assert(result == 0);
@@ -974,7 +974,7 @@ int CHKPKE_Upd(CHKPKE_t chk, int64_t interval) {
     return 0;
 }
 
-char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t end, int *sz) {
+unsigned char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t end, size_t *sz) {
     _chkpke_node_config_t *keylist;
     _chkpke_node_config_t *nextkey;
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
@@ -984,7 +984,7 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     int length;
     int sum;
     //size_t lwrote;
-    char *buffer;
+    unsigned char *buffer;
 
     sum = 0;
 
@@ -994,7 +994,7 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     //printf("obtaining keylist\n");
     keylist = _CHKPKE_keylist_for_start_end(chk, start, end);
     if (keylist == (_chkpke_node_config_t *)NULL) {
-        return (char *)NULL;
+        return (unsigned char *)NULL;
     }
     //printf("obtained keylist\n");
 
@@ -1125,7 +1125,7 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     // validate export
     sum += 256;  // pad for DER header + some extra just in case
     length = sum;
-    buffer = (char *)malloc((sum) * sizeof(char));
+    buffer = (unsigned char *)malloc((sum) * sizeof(char));
     assert(buffer != NULL);
     result = asn1_der_coding(privkey_asn1, "", buffer, &length, asnError);
     assert(result == 0);
@@ -1142,7 +1142,7 @@ char *CHKPKE_privkey_encode_delegate_DER(CHKPKE_t chk, int64_t start, int64_t en
     return buffer;
 }
 
-char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, int *sz) {
+unsigned char *CHKPKE_privkey_encode_DER(CHKPKE_t chk, int64_t interval, size_t *sz) {
     int64_t e;
 
     e = _expi64(chk->order, chk->depth) - 1;
@@ -1400,7 +1400,7 @@ static char *_gen_pbc_param_a_string(CHKPKE_t chk) {
     return buffer;
 }
 
-int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
+int CHKPKE_init_pubkey_decode_DER(CHKPKE_t chk, unsigned char *der, size_t sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE pubkey_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -1618,7 +1618,7 @@ error_cleanup1:
     return -1;
 }
 
-int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, char *der, int sz) {
+int CHKPKE_init_privkey_decode_DER(CHKPKE_t chk, unsigned char *der, size_t sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE privkey_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -1913,7 +1913,7 @@ error_cleanup1:
     return -1;
 }
 
-char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
+unsigned char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, size_t *sz) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -1930,7 +1930,7 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
     int depth;
     int sum, length;
     int result;
-    char *buffer;
+    unsigned char *buffer;
 
     sum = 0;
 
@@ -2010,7 +2010,7 @@ char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, int *sz) {
     // validate export
     sum += 256;  // pad for DER header + some extra just in case
     length = sum;
-    buffer = (char *)malloc((sum) * sizeof(char));
+    buffer = (unsigned char *)malloc((sum) * sizeof(char));
     assert(buffer != NULL);
     result = asn1_der_coding(ciphertext_asn1, "", buffer, &length, asnError);
     assert(result == 0);
@@ -2106,7 +2106,7 @@ static int _asn1_read_element_gt_from_xy(element_t value, asn1_node root, char *
     return 0;
 }
 
-int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, char *cipher, int sz, int64_t interval) {
+int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, unsigned char *cipher, size_t sz, int64_t interval) {
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
@@ -2289,7 +2289,7 @@ int64_t CHKPKE_privkey_max_interval(CHKPKE_t chk) {
     return _rightmost_active_CHK_node(chk->tree, chk->depth);
 }
 
-unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz) {
+unsigned char *CHKPKE_element_to_bytes(element_t e, size_t *sz) {
     int len;
     unsigned char *e_bytes;
     len = element_length_in_bytes(e);
@@ -2301,7 +2301,7 @@ unsigned char *CHKPKE_element_to_bytes(element_t e, int *sz) {
     return e_bytes;
 }
 
-int CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, int sz) {
+int CHKPKE_init_element_from_bytes(element_t e, CHKPKE_t chk, unsigned char *bytes, size_t sz) {
     int len;
     len = element_length_in_bytes(chk->ePQ);
     if (sz != len) return -1;

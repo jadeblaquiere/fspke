@@ -72,8 +72,9 @@ int main(int argc, char **argv) {
         {NULL}
     };
     CHKPKE_t pke;
-    char *der;
-    int sz, bufsz, result;
+    unsigned char *der;
+    size_t sz, bufsz;
+    int result;
     element_t shared_element;
     unsigned char shared_hash[crypto_aead_chacha20poly1305_ietf_KEYBYTES];
     unsigned char nonce[crypto_aead_chacha20poly1305_ietf_NPUBBYTES];
@@ -189,7 +190,7 @@ int main(int argc, char **argv) {
 
     // hash shared key to get a 256-bit key for encryption w/ChaCha
     {
-        int len = 0;
+        size_t len = 0;
         unsigned char *e_bytes;
         e_bytes = CHKPKE_element_to_bytes(shared_element, &len);
 
@@ -255,8 +256,16 @@ int main(int argc, char **argv) {
         free(der);
         sz += clen + 256;
         bufsz = sz;
-        der = (char *)malloc((sz) * sizeof(char));
-        result = asn1_der_coding(message_asn1, "ad", der, &sz, asnError);
+        der = (unsigned char *)malloc((sz) * sizeof(char));
+        {
+            int isz;
+            isz = (int)sz;
+            result = asn1_der_coding(message_asn1, "ad", der, &isz, asnError);
+            sz = isz;
+        }
+        if (result != 0) {
+            asn1_perror(result);
+        }
         assert(result == 0);
         assert(sz < bufsz);
 
@@ -276,7 +285,12 @@ int main(int argc, char **argv) {
 
         // encode the entire message
         sz = bufsz;
-        result = asn1_der_coding(message_asn1, "", der, &sz, asnError);
+        {
+            int isz;
+            isz = sz;
+            result = asn1_der_coding(message_asn1, "", der, &isz, asnError);
+            sz = isz;
+        }
         assert(result == 0);
         assert(sz < bufsz);
 

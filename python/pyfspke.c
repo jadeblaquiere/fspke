@@ -84,10 +84,10 @@ static int CHKPKE_init(CHKPKE *self, PyObject *args, PyObject *kwargs) {
 	int depth = 6;
 	int order = 16;
 	// create and import from ASN1 DER (bytes type)
-	char *privkey_string = NULL;
-	int privkey_len = 0;
-	char *pubkey_string = NULL;
-	int pubkey_len = 0;
+	unsigned char *privkey_string = NULL;
+	size_t privkey_len = 0;
+	unsigned char *pubkey_string = NULL;
+	size_t pubkey_len = 0;
 
 	int status;
 
@@ -156,12 +156,12 @@ static void CHKPKE_dealloc(CHKPKE *self) {
 }
 
 static PyObject *CHKPKE_pubkey_encode(CHKPKE *self, PyObject *args) {
-    char *der;
-    int len;
+    unsigned char *der;
+    size_t len;
     PyObject *bytes;
 
     der = CHKPKE_pubkey_encode_DER(self->pke, &len);
-    bytes = PyBytes_FromStringAndSize(der, len);
+    bytes = PyBytes_FromStringAndSize((char *)der, len);
     free(der);
     return bytes;
 }
@@ -170,8 +170,8 @@ static PyObject *CHKPKE_privkey_encode(CHKPKE *self, PyObject *args, PyObject *k
 	char *keys[] = {"start", "end", NULL};
     int64_t start = 0;
     int64_t end = -1;
-    char *der;
-    int len;
+    unsigned char *der;
+    size_t len;
     PyObject *bytes;
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|LL", keys, &start, &end)) {
@@ -196,7 +196,7 @@ static PyObject *CHKPKE_privkey_encode(CHKPKE *self, PyObject *args, PyObject *k
 		return NULL;
     }
 
-    bytes = PyBytes_FromStringAndSize(der, len);
+    bytes = PyBytes_FromStringAndSize((char *)der, len);
     free(der);
     return bytes;
 }
@@ -204,8 +204,8 @@ static PyObject *CHKPKE_privkey_encode(CHKPKE *self, PyObject *args, PyObject *k
 static PyObject *CHKPKE_encrypt(CHKPKE *self, PyObject *args, PyObject *kwargs) {
 	char *keys[] = {"element", "interval", NULL};
     int64_t interval = -1;
-    char *der;
-    int len;
+    unsigned char *der;
+    size_t len;
     PyObject *bytes;
     PyObject *element;
 
@@ -233,7 +233,7 @@ static PyObject *CHKPKE_encrypt(CHKPKE *self, PyObject *args, PyObject *kwargs) 
 		return NULL;
     }
 
-    bytes = PyBytes_FromStringAndSize(der, len);
+    bytes = PyBytes_FromStringAndSize((char *)der, len);
     free(der);
     return bytes;
 }
@@ -241,8 +241,8 @@ static PyObject *CHKPKE_encrypt(CHKPKE *self, PyObject *args, PyObject *kwargs) 
 static PyObject *CHKPKE_decrypt(CHKPKE *self, PyObject *args, PyObject *kwargs) {
 	char *keys[] = {"ciphertext", "interval", NULL};
     int64_t interval = -1;
-    char *der;
-    int len;
+    unsigned char *der;
+    size_t len;
     int status;
     CHKPKE_Element *element;
 
@@ -409,12 +409,12 @@ void Element_dealloc(CHKPKE_Element *self) {
 }
 
 static PyObject *Element_to_bytes(CHKPKE_Element *self, PyObject *args) {
-    char *b;
-    int len;
+    unsigned char *b;
+    size_t len;
     PyObject *bytes;
 
-    b = (char *)CHKPKE_element_to_bytes(self->e, &len);
-    bytes = PyBytes_FromStringAndSize(b, len);
+    b = CHKPKE_element_to_bytes(self->e, &len);
+    bytes = PyBytes_FromStringAndSize((char *)b, len);
     free(b);
     return bytes;
 }
