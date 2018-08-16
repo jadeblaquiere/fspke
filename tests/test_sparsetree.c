@@ -72,7 +72,7 @@ START_TEST(test_sparsetree_walk)
     int i, j, anodes;
     uint64_t k, levelsz;
     sparseTree_t tree;
-    sparseTree_ptr_t nptr;
+    sparseTree_ptr nptr;
     _nodeHash_t *nd;
     
     assert(allocated_nodes == 0);
@@ -110,7 +110,7 @@ START_TEST(test_sparsetree_random)
     int i, j;
     uint64_t k, levelsz;
     sparseTree_t tree;
-    sparseTree_ptr_t nptr;
+    sparseTree_ptr nptr;
     _nodeHash_t *nd;
     
     assert(allocated_nodes == 0);

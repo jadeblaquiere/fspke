@@ -62,7 +62,7 @@ typedef struct _sparseTree_t {
 } _sparseTree_t;
 
 typedef _sparseTree_t sparseTree_t[1];
-typedef _sparseTree_t *sparseTree_ptr_t;
+typedef _sparseTree_t *sparseTree_ptr;
 
 void sparseTree_init(sparseTree_t node, int n, void (*init)(_sparseTree_t *));
 void sparseTree_clear(sparseTree_t node);

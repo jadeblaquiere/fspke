@@ -90,6 +90,7 @@ typedef struct {
 } _CHKPKE_t;
 
 typedef _CHKPKE_t CHKPKE_t[1];
+typedef _CHKPKE_t *CHKPKE_ptr;
 
 //void CHKPKE_init(chkPKE_t chk);
 void CHKPKE_clear(CHKPKE_t chk);

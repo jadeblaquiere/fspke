@@ -55,6 +55,7 @@ typedef struct {
 } _cwHash_t;
 
 typedef _cwHash_t cwHash_t[1];
+typedef _cwHash_t *cwHash_ptr;
 
 void cwHash_init(cwHash_t cwh, mpz_t p);
 void cwHash_clear(cwHash_t cwh);

@@ -597,8 +597,8 @@ unsigned char *CHKPKE_pubkey_encode_DER(CHKPKE_t chk, size_t *sz) {
 // derive the secrets for this specific node... recurse up tree as needed
 // to derive as the secrets are calculated only when needed (lazy allocation)
 static int _CHKPKE_der_for_node(CHKPKE_t chk, int depth, int64_t ordinal) {
-    sparseTree_ptr_t node;
-    sparseTree_ptr_t parent;
+    sparseTree_ptr node;
+    sparseTree_ptr parent;
     _chkpke_node_data_t *nd;
     _chkpke_node_data_t *pnd;
 
@@ -693,7 +693,7 @@ static _chkpke_node_config_t *_CHKPKE_keylist_for_depth_interval(CHKPKE_t chk, i
     _chkpke_node_config_t *head = (_chkpke_node_config_t *)NULL;
     _chkpke_node_config_t *next = (_chkpke_node_config_t *)NULL;
     _chkpke_node_config_t *nconfig = (_chkpke_node_config_t *)NULL;
-    sparseTree_ptr_t node;
+    sparseTree_ptr node;
     int64_t i;
     int64_t upstart, upend, startstop, beginend;
     //printf("keylist head @ (%d, %ld, %ld)\n", depth, start, end);
@@ -925,7 +925,7 @@ static void _CHKPKE_keylist_clean(_chkpke_node_config_t *list) {
 
 int CHKPKE_Upd(CHKPKE_t chk, int64_t interval) {
     _chkpke_node_config_t *keylist;
-    sparseTree_ptr_t node, parent, sibling;
+    sparseTree_ptr node, parent, sibling;
     int i;
 
     // defer bounds checking to _CHKPKE_keylist_for_interval
@@ -1917,8 +1917,8 @@ unsigned char *CHKPKE_Enc_DER(CHKPKE_t chk, element_t plain, int64_t interval, s
     ASN1_TYPE CHKPKE_asn1 = ASN1_TYPE_EMPTY;
     ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
-    sparseTree_ptr_t node;
-    sparseTree_ptr_t pathnode;
+    sparseTree_ptr node;
+    sparseTree_ptr pathnode;
     element_t lambda;
     element_t lambdaP;
     element_t d;
@@ -2111,7 +2111,7 @@ int CHKPKE_Dec_DER(element_t plain, CHKPKE_t chk, unsigned char *cipher, size_t 
     ASN1_TYPE ciphertext_asn1 = ASN1_TYPE_EMPTY;
     char asnError[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
     int i, result;
-    sparseTree_ptr_t node;
+    sparseTree_ptr node;
     _chkpke_node_data_t *nd;
     char abuffer[256];
     mpz_t rmin1, x, y;
