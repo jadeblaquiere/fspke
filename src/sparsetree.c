@@ -38,12 +38,12 @@
 // recursive algorithm to sum the number of nodes in previous rows
 // finite sequence is 1 + n + n**2 + .. n**k
 // (it is assumed that the number of nodes is less than 2**64)
-static uint64_t _recurse_prev_rows(n, k) {
+static uint64_t _recurse_prev_rows(int n, int k) {
     if (k == 0) return 1;
     return (1 + (n * _recurse_prev_rows(n,k-1)));
 }
 
-static uint64_t _calc_prev_rows(n, k) {
+static uint64_t _calc_prev_rows(int n, int k) {
     return _recurse_prev_rows(n, k-1);
 }
 
